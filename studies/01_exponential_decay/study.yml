@@ -1,0 +1,13 @@
+# What the site and the publishing need, read without running the script.
+category: Time integration
+kind: example          # verification, method, example, benchmark or result
+public: true           # goes to the public gallery (a `result` also needs its `preprint`)
+codes: [numpy]         # their versions and commits are recorded with the result
+docs_preset: full      # the preset the page shows
+runtime: well under a second
+status: >-
+  An example of the layout, and a small verification: the three methods reach their
+  theoretical orders (1, 2 and 4) to within a few percent over the full range of steps.
+figures:
+  - The error at t = 1 against the step size; the legend gives the fitted orders.
+level: introductory    # an extra field of this gallery (gallery.yml, `fields`)

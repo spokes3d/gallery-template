@@ -1,0 +1,23 @@
+---
+title: gallery-template
+description: Galleries of computational studies, with cached results and honest status boxes.
+---
+
+A gallery is a repository of **studies**: complete, standalone scripts that use the codes of a
+project, each with its result cached and a status box that says what it verifies and what it
+does not. This template is the skeleton of a gallery and the tools that run it:
+
+- `gallery check`: every `study.yml` is complete, and the public studies may go public;
+- `gallery build`: the Studies pages of the site, from the cached results (a simulation runs
+  only when its result is not cached, or when asked for);
+- `gallery export`: the public gallery, the studies marked `public: true`, as a repository;
+- a reusable workflow that pushes that export to the public repository as a pull request.
+
+A project keeps its studies in a private gallery, published or not, and publishes some of them
+in a public one: verification, method demonstrations and examples at once, novel results once
+their preprint is out.
+
+- [Starting a gallery](/gallery-template/guides/new-gallery/)
+- [Adding a study](/gallery-template/guides/studies/)
+- [Publishing studies](/gallery-template/guides/publishing/)
+- [The example study](/gallery-template/studies/exponential-decay/)

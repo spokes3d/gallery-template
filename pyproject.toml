@@ -1,0 +1,51 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [ "setuptools", "wheel" ]
+
+[project]
+name = "gallery-tools"
+version = "0.1.0"
+description = "Galleries of computational studies: check the studies, build the site, publish the public ones."
+readme = "README.md"
+keywords = [ "gallery", "reproducibility", "simulation", "starlight" ]
+license = { file = "LICENSE.txt" }
+authors = [ { name = "Max" } ]
+requires-python = ">=3.11"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [ "matplotlib", "numpy", "pyyaml" ]
+optional-dependencies.dev = [ "gallery-tools[docs,test]", "pre-commit", "pyproject-fmt", "ruff" ]
+# the shared docs workflow installs a Jupyter kernel
+optional-dependencies.docs = [ "ipykernel" ]
+optional-dependencies.test = [ "pytest", "pytest-cov" ]
+urls.Source = "https://github.com/spokes3d/gallery-template"
+scripts.gallery = "gallery_tools.cli:main"
+
+[tool.setuptools.packages.find]
+where = [ "src" ]
+
+[tool.setuptools.package-data]
+gallery_tools = [ "skeleton/*", "skeleton/**/*" ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+lint.select = [ "B", "D", "E", "F", "I", "UP", "W" ]
+lint.ignore = [ "D401", "E501" ]  # noun-phrase docstrings; line length is the formatter's
+# the module docstring of a study is the text of its page, in Markdown; the functions are short
+lint.per-file-ignores."studies/*" = [ "D" ]
+lint.per-file-ignores."tests/*" = [ "D" ]
+lint.pydocstyle.convention = "numpy"
+
+[tool.pytest]
+ini_options.testpaths = [ "tests" ]
+ini_options.addopts = "-ra"
+
+[tool.coverage]
+run.source = [ "gallery_tools" ]
+report.exclude_lines = [ "pragma: no cover", "if __name__ == .__main__.:" ]

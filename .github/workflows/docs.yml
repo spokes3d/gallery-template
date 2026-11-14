@@ -1,0 +1,35 @@
+name: Docs
+
+# The site of the template (how to start and run a gallery, and the example study), built from
+# the cached results with the shared workflow of max-models/starlight-theme; deployed to GitHub
+# Pages from devel.
+
+on:
+  push:
+    branches: ["main", "devel"]
+  pull_request:
+    branches: ["main", "devel"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    uses: max-models/starlight-theme/.github/workflows/docs.yml@v0
+    with:
+      node-version: "24"
+      notebooks: false
+      pre-build: uv run gallery build --cached-only
+      smoke-paths: |
+        studies/index.html
+        studies/exponential-decay/index.html
+        studies/exponential-decay/plot-1.png
+        by-kind/example/index.html
+        guides/publishing/index.html

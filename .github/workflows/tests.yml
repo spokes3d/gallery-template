@@ -1,0 +1,34 @@
+name: Tests
+
+# The tools' unit tests (coverage at least 95 %) and the example study in its smoke preset.
+
+on:
+  push:
+    branches: ["main", "devel"]
+  pull_request:
+    branches: ["main", "devel"]
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Install
+        run: uv sync --extra test
+
+      - name: Check the studies
+        run: uv run gallery check
+
+      - name: Run the tests
+        run: uv run pytest --cov=gallery_tools --cov-report=term-missing --cov-fail-under=95
