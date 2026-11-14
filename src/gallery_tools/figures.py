@@ -9,8 +9,9 @@ plasma-plots converts Matplotlib figures and animations (the same conversion as 
 pages (``plot-<n>.png``, ``plot-<n>.dark.png``) are shown until it has loaded. Formulas in
 labels become Unicode text (plasma-plots' default), which the pictures show as well.
 
-Without plasma-plots (or when a figure cannot be converted) a Matplotlib figure is written as a
-picture, ``plot-<n>.png``, as before.
+Without plasma-plots, or when any part of a figure cannot be converted (the conversion is
+strict: a figure is never published without one of its parts), a Matplotlib figure is written
+as a picture, ``plot-<n>.png``, as before, with a warning in the build.
 """
 
 from __future__ import annotations
@@ -89,9 +90,10 @@ def to_plotly(item: Any):
     from plasma_plots.plotly_backend import animation_to_plotly
     from plasma_plots.plotly_backend import to_plotly as convert
 
+    # strict: a figure with a part the conversion skips is not published without that part
     if _is_animation(item):
-        return animation_to_plotly(item)
-    return convert(item)
+        return animation_to_plotly(item, strict=True)
+    return convert(item, strict=True)
 
 
 @dataclass

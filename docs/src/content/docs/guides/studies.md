@@ -67,9 +67,10 @@ see in it. The builder runs the script in its folder, so relative paths start th
 figure into an interactive Plotly figure in the site's colours (zoom, hover values, light and
 dark mode), with pictures of it shown while it loads. plasma-plots converts the figures: draw
 them with plasma-plots (`plasma_plots.figure(...)`, the `.plasma.plot` accessors) or with plain
-Matplotlib (lines, scatter, `imshow`, `pcolormesh`, contours, colorbars). A figure the
-conversion cannot handle is shown as a picture instead, with a warning in the build; change the
-figure rather than accept the picture where you can.
+Matplotlib (lines, scatter, `pcolormesh`, `imshow` with a colormap, contours, colorbars). A
+figure with any part the conversion cannot handle is shown as a picture instead, with a warning
+in the build (the conversion is strict, so a web figure never lacks a part); change the figure
+rather than accept the picture where you can.
 
 For something that moves, return an animation from `plot`: a Matplotlib `FuncAnimation`
 becomes a web figure with a slider and a Play button (keep the frames few, a few dozen, and the
