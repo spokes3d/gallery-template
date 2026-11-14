@@ -260,7 +260,12 @@ def test_export(gallery, tmp_path):
     (target / ".git").mkdir(parents=True)
     (target / "stale.txt").write_text("removed")
     (target / "olddir").mkdir()
+    (target / ".venv").mkdir()
+    (target / "docs" / "node_modules").mkdir(parents=True)
+    (target / "docs" / "stale.md").write_text("removed")
     exported = export(gallery, target)
+    assert (target / ".venv").is_dir() and (target / "docs" / "node_modules").is_dir()
+    assert not (target / "docs" / "stale.md").exists()
     assert [s.stem for s in exported] == ["01_squares"]
     assert (target / ".git").is_dir()
     assert not (target / "stale.txt").exists() and not (target / "olddir").exists()

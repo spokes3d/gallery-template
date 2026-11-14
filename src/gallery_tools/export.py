@@ -1,7 +1,7 @@
 """Write the public gallery: the public studies of a private gallery, as a repository.
 
 The public repository is generated, never edited by hand. ``export`` empties the target folder
-(keeping ``.git``) and writes:
+(keeping ``.git``, and ``.venv`` and ``node_modules`` of a local checkout) and writes:
 
 - ``studies/<stem>/`` of every study with ``public: true``, without the files its ``exclude``
   globs name and without smoke results;
@@ -267,20 +267,29 @@ def public_fields(gallery: Gallery) -> dict[str, dict[str, Any]]:
     return fields
 
 
+#: Kept when the target is emptied: git, and the environments of a local checkout.
+KEEP = {".git", ".venv", "node_modules"}
+
+
 def _clean(target: Path) -> None:
-    """Empty ``target``, keeping ``.git``."""
+    """Empty ``target``, keeping ``.git``, ``.venv`` and ``node_modules`` at any depth."""
     target.mkdir(parents=True, exist_ok=True)
     for path in target.iterdir():
-        if path.name == ".git":
+        if path.name in KEEP:
             continue
         if path.is_dir() and not path.is_symlink():
-            shutil.rmtree(path)
+            if any(path.rglob("node_modules")):
+                _clean(path)
+                if not any(path.iterdir()):
+                    path.rmdir()
+            else:
+                shutil.rmtree(path)
         else:
             path.unlink()
 
 
 def export(gallery: Gallery, target: Path) -> list[Study]:
-    """Write the public gallery into ``target`` (emptied first, ``.git`` kept).
+    """Write the public gallery into ``target`` (emptied first; ``.git``, ``.venv`` and ``node_modules`` kept).
 
     Parameters
     ----------
