@@ -2,9 +2,10 @@
 
 The builder reads each study's docstring and ``study.yml`` without running it, gets the result
 of its docs preset from the cache in ``studies/<stem>/results/`` (or runs it and fills the
-cache), draws the figures with the script's ``plot`` function and writes a page with the
-description, the status, the complete source, the printed output, an optional table and the
-figures. It also writes the listing, and one page per code and per kind that lists the studies
+cache), draws the figures with the script's ``plot`` function and writes a page led by the
+figures: the first paragraph of the description, the figures with their captions, the status,
+the rest of the description, an optional table or the printed output, the details of the run and
+the complete source. It also writes the listing, and one page per code and per kind that lists the studies
 using that code or of that kind.
 
 A simulation is run only when there is no cached result for its preset, or when it is asked for
@@ -236,7 +237,9 @@ def build_study(
     ]
     if meta_info.get("preprint"):
         rows.append(("Preprint", str(meta_info["preprint"])))
-    body: list[str] = []
+    intro, _, rest = study.description.partition("\n\n")
+    figures_part: list[str] = []
+    results_part: list[str] = []
     if study.stub:
         rows.append(("State", "in development, not run"))
     else:
@@ -259,17 +262,21 @@ def build_study(
                 table = namespace["table"](result) if "table" in namespace else ""
         finally:
             os.chdir(previous)
-        captions = meta_info.get("figures") or []
+        figures = [plt.figure(number) for number in plt.get_fignums()]
         output.mkdir(parents=True)
-        plots = []
-        for index, number in enumerate(plt.get_fignums(), start=1):
+        for index, (figure, caption) in enumerate(
+            zip(figures, study.captions(figures), strict=True), start=1
+        ):
             filename = f"plot-{index}.png"
-            plt.figure(number).savefig(output / filename, dpi=150, bbox_inches="tight")
-            caption = captions[index - 1] if index <= len(captions) else f"Plot {index}"
-            plots.append(
-                f"![{study.title}: plot {index}]({site.base}/studies/{study.slug}/{filename})"
-                f"\n\n*{sanitize_markdown(caption)}*"
-            )
+            figure.savefig(output / filename, dpi=150, bbox_inches="tight")
+            text = sanitize_markdown(caption) if caption else ""
+            figures_part += [
+                f"![{study.title}, figure {index}]"
+                f"({site.base}/studies/{study.slug}/{filename})",
+                "",
+                f"**Figure {index}.** {text}".rstrip(),
+                "",
+            ]
         plt.close("all")
         presets = ", ".join(f"`{p}`" for p in study.presets)
         rows += [
@@ -279,16 +286,10 @@ def build_study(
             ("Versions", site.versions(study, meta)),
         ]
         if table:
-            body += ["## Comparison", "", table, ""]
+            results_part += ["## Comparison", "", table, ""]
         text = printed.getvalue().strip()
         if text and not table:
-            body += ["## Printed output", "", "```text", text, "```", ""]
-        body += [
-            "## Plots",
-            "",
-            "\n\n".join(plots) or "This study does not draw figures.",
-            "",
-        ]
+            results_part += ["## Printed output", "", "```text", text, "```", ""]
     page = [
         "---",
         f"title: {json.dumps(study.title)}",
@@ -297,19 +298,26 @@ def build_study(
         f"  order: {study.order}",
         "---",
         "",
+        sanitize_markdown(intro),
+        "",
+        *figures_part,
+        f":::note[Status]\n{sanitize_markdown(str(meta_info['status']))}\n:::",
+        "",
+    ]
+    if rest.strip():
+        page += ["## The study", "", sanitize_markdown(rest.strip()), ""]
+    page += [
+        *results_part,
+        "## Details",
+        "",
         "| | |",
         "|---|---|",
         *[f"| {k} | {v} |" for k, v in rows],
-        "",
-        f":::note[Status]\n{sanitize_markdown(str(meta_info['status']))}\n:::",
-        "",
-        sanitize_markdown(study.description),
         "",
         "## Python source",
         "",
         source_fence(study.code),
         "",
-        *body,
     ]
     site.studies.mkdir(parents=True, exist_ok=True)
     (site.studies / f"{study.slug}.mdx").write_text("\n".join(page))
@@ -355,7 +363,7 @@ def write_index(site: Site, studies: list[Study], intro: str = "") -> None:
     text = intro or (
         "Each study is a complete script with its result cached, so that this site does not "
         "rerun long simulations. A study says what it verifies and what it does not: read "
-        "the status box before the figures."
+        "the status box under the figures."
     )
     lines = [
         "---",

@@ -1,4 +1,4 @@
-r"""Exponential decay: the order of convergence of three time integrators.
+r"""Exponential decay.
 
 The example study of the template. The decay $\dot y = -\lambda y$, $y(0) = 1$, is integrated
 to $t = 1$ with the explicit Euler, the midpoint and the classical Runge-Kutta method, at a

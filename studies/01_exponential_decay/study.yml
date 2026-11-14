@@ -5,9 +5,12 @@ public: true           # goes to the public gallery (a `result` also needs its `
 codes: [numpy]         # their versions and commits are recorded with the result
 docs_preset: full      # the preset the page shows
 runtime: well under a second
+summary: The order of convergence of three time integrators on the decay equation.
 status: >-
   An example of the layout, and a small verification: the three methods reach their
   theoretical orders (1, 2 and 4) to within a few percent over the full range of steps.
 figures:
-  - The error at t = 1 against the step size; the legend gives the fitted orders.
+  - >-
+    The error at t = 1 against the step size for the explicit Euler, midpoint and
+    Runge-Kutta methods; the legend gives the fitted orders, close to 1, 2 and 4.
 level: introductory    # an extra field of this gallery (gallery.yml, `fields`)

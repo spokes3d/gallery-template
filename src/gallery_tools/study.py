@@ -125,6 +125,25 @@ class Study:
         first = self.description.split("\n\n", 1)[0].replace("\n", " ")
         return first.split(". ")[0] if first else self.title
 
+    def captions(self, figures: list[Any]) -> list[str | None]:
+        """The caption of each figure ``plot`` drew, None where it has none.
+
+        A figure's own caption (``fig.caption``, which plasma-plots' ``figure(caption=...)`` and
+        maxplotlib's ``Canvas(caption=...)`` set) comes first, then the caption of its place in
+        ``figures`` of ``study.yml``.
+
+        Parameters
+        ----------
+        figures : list of matplotlib.figure.Figure
+            The figures, in the order ``plot`` drew them.
+        """
+        listed = list(self.meta.get("figures") or [])
+        return [
+            getattr(figure, "caption", None)
+            or (str(listed[index]) if index < len(listed) else None)
+            for index, figure in enumerate(figures)
+        ]
+
     def cache(self, preset: str) -> tuple[Path, Path]:
         """The result file and the metadata file of ``preset``."""
         results = self.folder / "results"
@@ -175,8 +194,8 @@ class Study:
                 out.append(
                     f"docs_preset {self.preset!r} is not in PRESETS {self.presets}"
                 )
-            if not isinstance(self.meta.get("figures"), list):
-                out.append("study.yml needs `figures`, a caption per figure")
+            if not isinstance(self.meta.get("figures", []), list):
+                out.append("study.yml: `figures` must be a list, a caption per figure")
         return out
 
     def public_problems(self, gallery: Gallery, local_modules: set[str]) -> list[str]:

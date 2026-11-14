@@ -73,7 +73,7 @@ def test_public_study_can_go_public(study: Study):
 
 @pytest.mark.parametrize("study", STUDIES, ids=IDS)
 def test_study_runs_in_smoke_preset(study: Study):
-    """The study runs in its smoke preset and draws one figure per caption."""
+    """The study runs in its smoke preset and every figure has a caption."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -90,8 +90,15 @@ def test_study_runs_in_smoke_preset(study: Study):
         pickle.loads(pickle.dumps(result, protocol=4))  # the cache stores it
         plt.close("all")
         namespace["plot"](result)
-        figures = plt.get_fignums()
+        figures = [plt.figure(number) for number in plt.get_fignums()]
+        captions = study.captions(figures)
         plt.close("all")
-    assert len(figures) == len(study.meta.get("figures") or [])
+    assert len(study.meta.get("figures") or []) <= len(figures), (
+        "study.yml has more captions than plot draws figures"
+    )
+    missing = [i + 1 for i, caption in enumerate(captions) if not caption]
+    assert not missing, (
+        f"figures {missing} have no caption (fig.caption or `figures` in study.yml)"
+    )
     if "table" in namespace:
         assert "|" in namespace["table"](result)
