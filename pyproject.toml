@@ -22,7 +22,7 @@ dependencies = [ "matplotlib", "numpy", "pyyaml" ]
 optional-dependencies.dev = [ "gallery-tools[docs,test]", "pre-commit", "pyproject-fmt", "ruff" ]
 # the shared docs workflow installs a Jupyter kernel; web figures need plasma-plots and kaleido
 optional-dependencies.docs = [ "ipykernel", "kaleido", "plasma-plots[web]" ]
-optional-dependencies.test = [ "pytest", "pytest-cov" ]
+optional-dependencies.test = [ "plasma-plots[web]", "pytest", "pytest-cov" ]
 urls.Source = "https://github.com/spokes3d/gallery-template"
 scripts.gallery = "gallery_tools.cli:main"
 
