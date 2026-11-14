@@ -1,0 +1,25 @@
+# The gallery of this template: one example study. A new gallery edits this file.
+site:
+  title: gallery-template
+  description: Galleries of computational studies, with cached results and honest status boxes.
+  owner: spokes3d
+  repo: gallery-template
+
+# The distributions whose versions and commits are recorded with each result.
+codes: [numpy, matplotlib]
+
+# Codes in private repositories: a public study must not use them.
+private_codes: []
+
+# Extra keys of study.yml, shown as rows of the study's table.
+fields:
+  level:
+    label: Level
+    default: introductory
+
+# A private gallery says where its public studies go (see the Publishing guide):
+# public:
+#   owner: spokes3d
+#   repo: gallery
+#   title: SPOKES3D gallery
+#   description: ...

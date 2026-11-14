@@ -1,0 +1,90 @@
+name: Sync public studies
+
+# The reusable sync of a private gallery into its public one: export the studies marked
+# `public: true` (`gallery export`) into a checkout of the public repository and push them to its
+# branch `sync`, where the public repository's sync_pr workflow opens a pull request into devel.
+# Nothing is pushed when the public studies did not change.
+#
+# The private gallery calls it from its own .github/workflows/sync.yml:
+#
+#   on:
+#     push: { branches: ["devel"] }
+#     workflow_dispatch:
+#   jobs:
+#     sync:
+#       uses: spokes3d/gallery-template/.github/workflows/sync.yml@devel
+#       secrets:
+#         deploy-key: ${{ secrets.PUBLIC_GALLERY_DEPLOY_KEY }}
+#
+# The deploy key is an SSH key with write access to the public repository only (Settings,
+# Deploy keys there); its private half is the secret of the private gallery. The public
+# repository (owner and name) comes from `public:` in gallery.yml.
+
+on:
+  workflow_call:
+    secrets:
+      deploy-key:
+        description: The private half of a deploy key with write access to the public repository.
+        required: true
+    inputs:
+      tools:
+        description: The gallery tools to export with (a pip requirement).
+        type: string
+        default: "gallery-tools @ git+https://github.com/spokes3d/gallery-template@devel"
+      base:
+        description: The branch of the public repository the pull request goes into.
+        type: string
+        default: devel
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: source
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+
+      - name: Check the public studies and find the public repository
+        id: target
+        working-directory: source
+        env:
+          TOOLS: ${{ inputs.tools }}
+        run: |
+          uv run --no-project --with "$TOOLS" gallery check
+          uv run --no-project --with "$TOOLS" python -c \
+            "from gallery_tools import load; p = load().public; print(f'repo={p.owner}/{p.repo}')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ steps.target.outputs.repo }}
+          ref: ${{ inputs.base }}
+          ssh-key: ${{ secrets.deploy-key }}
+          path: public
+
+      - name: Export the public studies
+        env:
+          TOOLS: ${{ inputs.tools }}
+        run: uv run --no-project --with "$TOOLS" gallery --root source export public
+
+      - name: Push to the sync branch
+        working-directory: public
+        env:
+          SOURCE: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          git add -A
+          if git diff --cached --quiet -- . ':!.gallery-export.json'; then
+            echo "the public studies did not change"
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898283+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Sync the public studies from ${SOURCE}@${SHA::7}"
+          git push --force origin HEAD:refs/heads/sync
