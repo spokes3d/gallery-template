@@ -72,5 +72,5 @@ it, and nothing in it can read the private one.
 To try an export by hand:
 
 ```bash
-uv run gallery export ../gallery   # empties ../gallery, keeps its .git
+uv run gallery export ../gallery   # empties ../gallery, keeps .git, .venv and node_modules
 ```

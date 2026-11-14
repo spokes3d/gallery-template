@@ -1,7 +1,7 @@
 """Write the public gallery: the public studies of a private gallery, as a repository.
 
 The public repository is generated, never edited by hand. ``export`` empties the target folder
-(keeping ``.git``) and writes:
+(keeping ``.git``, and ``.venv`` and ``node_modules`` of a local checkout) and writes:
 
 - ``studies/<stem>/`` of every study with ``public: true``, without the files its ``exclude``
   globs name and without smoke results;
@@ -238,20 +238,58 @@ def readme(gallery: Gallery, studies: list[Study]) -> str:
     )
 
 
+def _has_page(overlay: Path, link: str) -> bool:
+    """Whether the overlay brings the page ``link`` (a path of the site, e.g. ``/programme/``)."""
+    page = overlay / "docs" / "src" / "content" / "docs" / link.strip("/")
+    return any(
+        path.is_file()
+        for path in (
+            page.with_suffix(".md"),
+            page.with_suffix(".mdx"),
+            page / "index.md",
+            page / "index.mdx",
+        )
+    )
+
+
+def public_fields(gallery: Gallery) -> dict[str, dict[str, Any]]:
+    """The extra fields of the public gallery: a link stays only if its page goes public too."""
+    public = gallery.public
+    assert public is not None
+    overlay = gallery.root / public.overlay
+    fields = {}
+    for key, spec in gallery.fields.items():
+        spec = dict(spec)
+        if spec.get("link") and not _has_page(overlay, spec["link"]):
+            spec.pop("link")
+            spec.pop("link_text", None)
+        fields[key] = spec
+    return fields
+
+
+#: Kept when the target is emptied: git, and the environments of a local checkout.
+KEEP = {".git", ".venv", "node_modules"}
+
+
 def _clean(target: Path) -> None:
-    """Empty ``target``, keeping ``.git``."""
+    """Empty ``target``, keeping ``.git``, ``.venv`` and ``node_modules`` at any depth."""
     target.mkdir(parents=True, exist_ok=True)
     for path in target.iterdir():
-        if path.name == ".git":
+        if path.name in KEEP:
             continue
         if path.is_dir() and not path.is_symlink():
-            shutil.rmtree(path)
+            if any(path.rglob("node_modules")):
+                _clean(path)
+                if not any(path.iterdir()):
+                    path.rmdir()
+            else:
+                shutil.rmtree(path)
         else:
             path.unlink()
 
 
 def export(gallery: Gallery, target: Path) -> list[Study]:
-    """Write the public gallery into ``target`` (emptied first, ``.git`` kept).
+    """Write the public gallery into ``target`` (emptied first; ``.git``, ``.venv`` and ``node_modules`` kept).
 
     Parameters
     ----------
@@ -288,6 +326,7 @@ def export(gallery: Gallery, target: Path) -> list[Study]:
                 shutil.copy2(path, dest)
 
     config = {k: v for k, v in gallery.raw.items() if k not in ("public", "site")}
+    config["fields"] = public_fields(gallery)
     config = {
         "site": {
             "title": public.title,

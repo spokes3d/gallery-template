@@ -102,7 +102,10 @@ def main(argv: list[str] | None = None) -> int:
     build.set_defaults(func=_build)
 
     export = sub.add_parser("export", help="write the public gallery into a folder")
-    export.add_argument("target", help="the public repository (emptied, .git kept)")
+    export.add_argument(
+        "target",
+        help="the public repository (emptied; .git, .venv and node_modules kept)",
+    )
     export.set_defaults(func=_export)
 
     args = parser.parse_args(argv)

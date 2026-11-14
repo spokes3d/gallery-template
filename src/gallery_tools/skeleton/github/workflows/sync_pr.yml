@@ -26,7 +26,8 @@ jobs:
           if [ "$open" = 0 ]; then
             gh pr create --repo "$REPO" --head sync --base devel \
               --title "Sync the public studies" \
-              --body "The public studies of the private gallery, exported by its sync workflow (see .gallery-export.json for the source commit). Review the changes, then merge to publish them."
+              --body "The public studies of the private gallery, exported by its sync workflow (see .gallery-export.json for the source commit). Review the changes, then merge to publish them." \
+              || gh pr view sync --repo "$REPO"  # opened meanwhile (e.g. by hand): fine
           else
             echo "the pull request is open; the push updated it"
           fi

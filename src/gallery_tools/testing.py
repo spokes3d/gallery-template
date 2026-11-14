@@ -67,7 +67,7 @@ def test_docs_result_is_cached(study: Study):
 def test_public_study_can_go_public(study: Study):
     """A study marked public meets the rules of the public gallery."""
     if not study.public or GALLERY.public is None:
-        pytest.skip("not published from this gallery")
+        pytest.skip("not public, or this gallery publishes nothing")
     assert not study.public_problems(GALLERY, local_modules(GALLERY))
 
 
