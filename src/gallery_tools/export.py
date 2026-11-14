@@ -52,6 +52,7 @@ SKELETON = {
     "github/workflows/docs.yml": ".github/workflows/docs.yml",
     "github/workflows/tests.yml": ".github/workflows/tests.yml",
     "github/workflows/sync_pr.yml": ".github/workflows/sync_pr.yml",
+    "github/workflows/sync_merge.yml": ".github/workflows/sync_merge.yml",
     "gitignore": ".gitignore",
     "tests/test_studies.py": "tests/test_studies.py",
 }

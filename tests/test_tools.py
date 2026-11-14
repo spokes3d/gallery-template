@@ -306,6 +306,7 @@ def test_export(gallery, tmp_path):
     assert (target / "docs" / "package.json").exists()
     assert (target / "docs" / "extra.txt").read_text() == "overlay"
     assert (target / ".github" / "workflows" / "sync_pr.yml").exists()
+    assert (target / ".github" / "workflows" / "sync_merge.yml").exists()
     assert (target / "tests" / "test_studies.py").exists()
     assert "public-gallery/studies/squares/" in (target / "README.md").read_text()
     stamp = json.loads((target / ".gallery-export.json").read_text())
