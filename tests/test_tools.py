@@ -17,6 +17,8 @@ SCRIPT = '''
 """A tiny study.
 
 It squares a few numbers. $x^2$ and {braces}.
+
+How it squares them: one at a time.
 """
 
 import matplotlib.pyplot as plt
@@ -221,6 +223,19 @@ def test_build(gallery, capsys):
     assert "| Rung | 1a ([about](/private-gallery/programme/)) |" in page
     assert "printed by plot" in page
     assert "/private-gallery/studies/squares/plot-1.png" in page
+    assert "**Figure 1.** the squares" in page
+    # the figures lead: intro, figures, status, the rest of the text, details, source
+    order = [
+        "It squares a few numbers",
+        "plot-1.png",
+        ":::note[Status]",
+        "How it squares them",
+        "## Details",
+        "## Python source",
+    ]
+    assert [page.index(text) for text in order] == sorted(
+        page.index(text) for text in order
+    )
     assert (site.public / "squares" / "plot-1.png").exists()
     assert "in development, not run" in (site.studies / "stub.mdx").read_text()
     index = (site.studies / "index.md").read_text()
@@ -346,3 +361,24 @@ def test_helpers():
     assert fmt_seconds(7200) == "2.0 h"
     assert source_fence("a = '```'").startswith("````python")
     assert provenance(["numpy", "not-a-distribution"])["numpy"]["version"]
+
+
+def test_captions_of_the_figures(gallery):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    study = Study(gallery.studies_dir / "01_squares")
+    own, listed, bare = plt.figure(), plt.figure(), plt.figure()
+    own.caption = "its own caption"
+    try:
+        # its own caption wins over study.yml; a figure past the list has none
+        assert study.captions([own, listed, bare]) == [
+            "its own caption",
+            None,
+            None,
+        ]
+        assert study.captions([listed, own]) == ["the squares", "its own caption"]
+    finally:
+        plt.close("all")

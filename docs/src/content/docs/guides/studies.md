@@ -23,6 +23,7 @@ Reference: the paper or the case it follows.
 import argparse
 
 import matplotlib.pyplot as plt
+import plasma_plots
 
 PRESETS = {"smoke": ..., "quick": ..., "full": ...}  # the sizes; "smoke" is required
 
@@ -32,7 +33,9 @@ def simulate(preset: str = "quick") -> dict:
 
 
 def plot(result: dict) -> None:
-    """Draw the figures with matplotlib and leave them open, one caption each."""
+    """Draw the figures and leave them open, each with a caption."""
+    with plasma_plots.figure(caption="What the figure shows.") as fig:
+        ...
 
 
 def table(result: dict) -> str:  # optional: a Markdown table the page shows
@@ -49,7 +52,14 @@ if __name__ == "__main__":
 
 The result of `simulate` must be picklable and must not depend on the script (use `asdict` of
 a dataclass, not the dataclass): the cache stores it, and `plot` has to work from the cache
-alone. Everything `plot` prints appears on the page, unless there is a `table`. The builder runs
+alone. Everything `plot` prints appears on the page, unless there is a `table`.
+
+The figures lead the page: the first paragraph of the docstring, then the figures, numbered,
+each with its caption, then the status and the rest of the text. A figure's caption is its own,
+`plasma_plots.figure(caption=...)` or maxplotlib's `Canvas(caption=...)` (both set
+`fig.caption`), else its entry in `figures` of `study.yml`; the test fails on a figure without
+one. Write the caption to be read without the text: what is plotted against what, and what to
+see in it. The builder runs
 the script in its folder, so relative paths start there.
 
 ## study.yml
@@ -66,8 +76,8 @@ docs_preset: full            # the preset the page shows
 runtime: about 3 minutes
 status: >-                   # what it verifies and what it does not, honestly
   Not a verification: ...
-figures:                     # a caption per figure, in the order plot draws them
-  - caption of figure 1
+figures:                     # captions, in the order plot draws the figures, for
+  - caption of figure 1      # figures without their own (plain Matplotlib)
 exclude: [data/raw/]         # files that stay private when the study is published
 stub: false                  # announced, not yet run: no simulate and plot needed
 ```
@@ -89,7 +99,7 @@ The kinds:
 
 Say what the study verifies and what it does not. A run that breaks a stability limit, is too
 short to reach the steady state or has placeholder data is not a verification, and the status
-box above the figures is where that is said.
+box under the figures is where that is said.
 
 ## The cache
 
