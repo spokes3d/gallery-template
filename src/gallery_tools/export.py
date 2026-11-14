@@ -238,6 +238,35 @@ def readme(gallery: Gallery, studies: list[Study]) -> str:
     )
 
 
+def _has_page(overlay: Path, link: str) -> bool:
+    """Whether the overlay brings the page ``link`` (a path of the site, e.g. ``/programme/``)."""
+    page = overlay / "docs" / "src" / "content" / "docs" / link.strip("/")
+    return any(
+        path.is_file()
+        for path in (
+            page.with_suffix(".md"),
+            page.with_suffix(".mdx"),
+            page / "index.md",
+            page / "index.mdx",
+        )
+    )
+
+
+def public_fields(gallery: Gallery) -> dict[str, dict[str, Any]]:
+    """The extra fields of the public gallery: a link stays only if its page goes public too."""
+    public = gallery.public
+    assert public is not None
+    overlay = gallery.root / public.overlay
+    fields = {}
+    for key, spec in gallery.fields.items():
+        spec = dict(spec)
+        if spec.get("link") and not _has_page(overlay, spec["link"]):
+            spec.pop("link")
+            spec.pop("link_text", None)
+        fields[key] = spec
+    return fields
+
+
 def _clean(target: Path) -> None:
     """Empty ``target``, keeping ``.git``."""
     target.mkdir(parents=True, exist_ok=True)
@@ -288,6 +317,7 @@ def export(gallery: Gallery, target: Path) -> list[Study]:
                 shutil.copy2(path, dest)
 
     config = {k: v for k, v in gallery.raw.items() if k not in ("public", "site")}
+    config["fields"] = public_fields(gallery)
     config = {
         "site": {
             "title": public.title,

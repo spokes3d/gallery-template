@@ -272,6 +272,9 @@ def test_export(gallery, tmp_path):
     config = load(target)
     assert config.repo == "public-gallery" and config.public is None
     assert config.fields["ladder"]["label"] == "Rung"
+    assert (
+        "link" not in config.fields["ladder"]
+    )  # the programme page does not go public
     project = tomllib.loads((target / "pyproject.toml").read_text())["project"]
     assert project["name"] == "public-gallery"
     assert any(d.startswith("gallery-tools @") for d in project["dependencies"])
@@ -293,6 +296,14 @@ def test_export(gallery, tmp_path):
     public = load(target)
     assert [s.stem for s in discover(public)] == ["01_squares"]
     assert not discover(public)[0].problems(public)
+
+
+def test_export_keeps_links_to_public_pages(gallery, tmp_path):
+    pages = gallery.root / "public" / "docs" / "src" / "content" / "docs"
+    pages.mkdir(parents=True)
+    (pages / "programme.mdx").write_text("---\ntitle: Programme\n---\n")
+    export(gallery, tmp_path / "public")
+    assert load(tmp_path / "public").fields["ladder"]["link"] == "/programme/"
 
 
 def test_export_errors(gallery, tmp_path):
