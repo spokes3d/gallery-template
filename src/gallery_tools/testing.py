@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from gallery_tools.config import load
+from gallery_tools.figures import collect
 from gallery_tools.study import Study, discover, local_modules
 
 __all__ = [
@@ -89,8 +90,8 @@ def test_study_runs_in_smoke_preset(study: Study):
             pytest.skip(f"a code the study needs is not installed: {error}")
         pickle.loads(pickle.dumps(result, protocol=4))  # the cache stores it
         plt.close("all")
-        namespace["plot"](result)
-        figures = [plt.figure(number) for number in plt.get_fignums()]
+        returned = namespace["plot"](result)
+        figures = collect(returned)
         captions = study.captions(figures)
         plt.close("all")
     assert len(study.meta.get("figures") or []) <= len(figures), (

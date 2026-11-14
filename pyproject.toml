@@ -20,11 +20,14 @@ classifiers = [
 ]
 dependencies = [ "matplotlib", "numpy", "pyyaml" ]
 optional-dependencies.dev = [ "gallery-tools[docs,test]", "pre-commit", "pyproject-fmt", "ruff" ]
-# the shared docs workflow installs a Jupyter kernel
-optional-dependencies.docs = [ "ipykernel" ]
-optional-dependencies.test = [ "pytest", "pytest-cov" ]
+# the shared docs workflow installs a Jupyter kernel; web figures need plasma-plots and kaleido
+optional-dependencies.docs = [ "ipykernel", "kaleido", "plasma-plots[web]" ]
+optional-dependencies.test = [ "plasma-plots[web]", "pytest", "pytest-cov" ]
 urls.Source = "https://github.com/spokes3d/gallery-template"
 scripts.gallery = "gallery_tools.cli:main"
+
+[tool.uv.sources]
+plasma-plots = { git = "https://github.com/max-models/plasma-plots", branch = "devel" }
 
 [tool.setuptools.packages.find]
 where = [ "src" ]

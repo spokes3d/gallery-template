@@ -84,6 +84,7 @@ def gallery(tmp_path):
             requires-python = ">=3.11"
             [tool.uv.sources]
             numpy = { git = "https://example.org/numpy", branch = "devel" }
+            plasma-plots = { git = "https://example.org/plasma-plots" }
             other = { git = "https://example.org/other" }
             """
         )
@@ -222,12 +223,15 @@ def test_build(gallery, capsys):
     page = (site.studies / "squares.mdx").read_text()
     assert "| Rung | 1a ([about](/private-gallery/programme/)) |" in page
     assert "printed by plot" in page
-    assert "/private-gallery/studies/squares/plot-1.png" in page
+    # a web figure, with its picture: the poster when kaleido draws none
+    assert "import PlotlyFigure" in page
+    assert '<PlotlyFigure src="/studies/squares/plot-1.plotly.json"' in page
+    assert (site.public / "squares" / "plot-1.plotly.json").exists()
     assert "**Figure 1.** the squares" in page
     # the figures lead: intro, figures, status, the rest of the text, details, source
     order = [
         "It squares a few numbers",
-        "plot-1.png",
+        "plot-1.plotly.json",
         ":::note[Status]",
         "How it squares them",
         "## Details",
@@ -299,8 +303,10 @@ def test_export(gallery, tmp_path):
     assert project["name"] == "public-gallery"
     assert any(d.startswith("gallery-tools @") for d in project["dependencies"])
     assert {"matplotlib", "numpy"} <= set(project["dependencies"])
+    assert "plasma-plots[web]" in project["optional-dependencies"]["docs"]
     sources = tomllib.loads((target / "pyproject.toml").read_text())["tool"]["uv"]
-    assert set(sources["sources"]) == {"numpy"}
+    # the codes the public studies use, and plasma-plots for the web figures
+    assert set(sources["sources"]) == {"numpy", "plasma-plots"}
     astro = (target / "docs" / "astro.config.mjs").read_text()
     assert 'repo: "public-gallery"' in astro
     assert (target / "docs" / "package.json").exists()
@@ -383,3 +389,80 @@ def test_captions_of_the_figures(gallery):
         assert study.captions([listed, own]) == ["the squares", "its own caption"]
     finally:
         plt.close("all")
+
+
+ANIMATED = (
+    SCRIPT
+    + """
+
+def plot(result):
+    from matplotlib.animation import FuncAnimation
+    import plotly.graph_objects as go
+
+    fig, ax = plt.subplots()
+    fig.caption = "a moving point"
+    (line,) = ax.plot(result["x"][:1], result["y"][:1], "o")
+    ax.set_xlim(0, 5)
+    ax.set_ylim(0, 25)
+
+    def update(i):
+        line.set_data(result["x"][i : i + 1], result["y"][i : i + 1])
+        return (line,)
+
+    extra = go.Figure(go.Scatter(x=[0, 1], y=[1, 0]), layout={"meta": {"caption": "a line"}})
+    return [FuncAnimation(fig, update, frames=3), extra]
+"""
+)
+
+
+@pytest.fixture
+def no_posters(monkeypatch):
+    """No kaleido pictures: the tests stay fast and need no browser."""
+    import plasma_plots.plotly_backend
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("no browser")
+
+    monkeypatch.setattr(plasma_plots.plotly_backend, "save_posters", fail)
+
+
+def test_animation_and_returned_figures(gallery, no_posters):
+    write_study(gallery.root, "04_animated", script=ANIMATED, figures=[])
+    with pytest.warns(UserWarning, match="no posters"):
+        build(gallery, ["04_animated"])
+    site = Site(gallery)
+    page = (site.studies / "animated.mdx").read_text()
+    assert "**Figure 1.** a moving point" in page
+    assert "**Figure 2.** a line" in page
+    web = json.loads((site.public / "animated" / "plot-1.plotly.json").read_text())
+    assert len(web["frames"]) == 3
+    # the picture of the animation's figure is its poster; a Plotly figure has none
+    assert 'poster="/studies/animated/plot-1.png"' in page
+    assert (site.public / "animated" / "plot-2.plotly.json").exists()
+    assert not (site.public / "animated" / "plot-2.png").exists()
+
+
+def test_a_figure_that_cannot_be_converted_is_a_picture(gallery, monkeypatch):
+    import gallery_tools.figures
+
+    def fail(item):
+        raise ValueError("not convertible")
+
+    monkeypatch.setattr(gallery_tools.figures, "to_plotly", fail)
+    with pytest.warns(UserWarning, match="written as a picture"):
+        build(gallery, ["01_squares"])
+    page = (Site(gallery).studies / "squares.mdx").read_text()
+    assert "PlotlyFigure" not in page
+    assert "](/private-gallery/studies/squares/plot-1.png)" in page
+
+
+def test_without_plasma_plots_a_figure_is_a_picture(gallery, monkeypatch):
+    import gallery_tools.figures
+
+    def missing(item):
+        raise ImportError("plasma_plots")
+
+    monkeypatch.setattr(gallery_tools.figures, "to_plotly", missing)
+    build(gallery, ["01_squares"])
+    page = (Site(gallery).studies / "squares.mdx").read_text()
+    assert "](/private-gallery/studies/squares/plot-1.png)" in page

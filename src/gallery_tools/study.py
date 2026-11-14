@@ -129,18 +129,19 @@ class Study:
         """The caption of each figure ``plot`` drew, None where it has none.
 
         A figure's own caption (``fig.caption``, which plasma-plots' ``figure(caption=...)`` and
-        maxplotlib's ``Canvas(caption=...)`` set) comes first, then the caption of its place in
-        ``figures`` of ``study.yml``.
+        maxplotlib's ``Canvas(caption=...)`` set, or ``layout.meta["caption"]`` of a Plotly
+        figure) comes first, then the caption of its place in ``figures`` of ``study.yml``.
 
         Parameters
         ----------
-        figures : list of matplotlib.figure.Figure
-            The figures, in the order ``plot`` drew them.
+        figures : list
+            The figures, in the order ``plot`` drew them (see ``gallery_tools.figures.collect``).
         """
+        from gallery_tools.figures import own_caption
+
         listed = list(self.meta.get("figures") or [])
         return [
-            getattr(figure, "caption", None)
-            or (str(listed[index]) if index < len(listed) else None)
+            own_caption(figure) or (str(listed[index]) if index < len(listed) else None)
             for index, figure in enumerate(figures)
         ]
 
