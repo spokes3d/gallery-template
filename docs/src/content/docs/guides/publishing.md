@@ -40,8 +40,9 @@ Once:
 2. Make a deploy key (`ssh-keygen -t ed25519 -N "" -f deploy_key`): the public half goes to
    the public repository (Settings, Deploy keys, **allow write access**), the private half to
    the private gallery as the secret `PUBLIC_GALLERY_DEPLOY_KEY`.
-3. In the public repository, allow GitHub Actions to create pull requests (Settings, Actions,
-   General) and enable Pages (source "GitHub Actions").
+3. In the public repository, allow GitHub Actions to create and approve pull requests
+   (Settings, Actions, General), enable Pages (source "GitHub Actions") and let the
+   `github-pages` environment deploy from `devel` (Settings, Environments).
 4. In the private gallery, add `.github/workflows/sync.yml`:
 
    ```yaml
@@ -61,8 +62,11 @@ Once:
 On every push to the private gallery's `devel`, the sync runs `gallery export` into a checkout
 of the public repository. If the public studies changed, it pushes the export to the public
 branch `sync`, and the public repository opens a pull request into `devel` (or updates the open
-one). Its checks run the studies' smoke presets and build the site from the cached results;
-merging the pull request publishes the studies.
+one). Its checks run the studies' smoke presets and build the site from the cached results.
+When all of them pass, the public repository's `sync_merge.yml` merges the pull request and
+deploys the site: the changes were reviewed in the private gallery, so the export goes out
+without a second review. A failing check leaves the pull request open, to fix in the private
+gallery.
 
 The export holds the public studies with their cached results, a `gallery.yml` and a
 `pyproject.toml` with the codes they use, the site, the workflows and `.gallery-export.json`
