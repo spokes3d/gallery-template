@@ -59,8 +59,35 @@ each with its caption, then the status and the rest of the text. A figure's capt
 `plasma_plots.figure(caption=...)` or maxplotlib's `Canvas(caption=...)` (both set
 `fig.caption`), else its entry in `figures` of `study.yml`; the test fails on a figure without
 one. Write the caption to be read without the text: what is plotted against what, and what to
-see in it. The builder runs
-the script in its folder, so relative paths start there.
+see in it. The builder runs the script in its folder, so relative paths start there.
+
+### Web figures
+
+**Web figures are the standard: draw every figure so that it can be one.** The builder turns each
+figure into an interactive Plotly figure in the site's colours (zoom, hover values, light and
+dark mode), with pictures of it shown while it loads. plasma-plots converts the figures: draw
+them with plasma-plots (`plasma_plots.figure(...)`, the `.plasma.plot` accessors) or with plain
+Matplotlib (lines, scatter, `imshow`, `pcolormesh`, contours, colorbars). A figure the
+conversion cannot handle is shown as a picture instead, with a warning in the build; change the
+figure rather than accept the picture where you can.
+
+For something that moves, return an animation from `plot`: a Matplotlib `FuncAnimation`
+becomes a web figure with a slider and a Play button (keep the frames few, a few dozen, and the
+grids small, since every frame is in the page's data). `plot` may also return Plotly figures,
+or a list of figures and animations:
+
+```python
+def plot(result: dict):
+    fig, ax = plt.subplots()
+    fig.caption = "The potential over one period, in the lab frame."
+    image = ax.imshow(result["phi"][0])
+
+    def update(i):
+        image.set_data(result["phi"][i])
+        return (image,)
+
+    return FuncAnimation(fig, update, frames=len(result["phi"]))
+```
 
 ## study.yml
 

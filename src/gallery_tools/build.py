@@ -2,8 +2,8 @@
 
 The builder reads each study's docstring and ``study.yml`` without running it, gets the result
 of its docs preset from the cache in ``studies/<stem>/results/`` (or runs it and fills the
-cache), draws the figures with the script's ``plot`` function and writes a page led by the
-figures: the first paragraph of the description, the figures with their captions, the status,
+cache), draws the figures with the script's ``plot`` function (as web figures where it can, see
+``gallery_tools.figures``) and writes a page led by the figures: the first paragraph of the description, the figures with their captions, the status,
 the rest of the description, an optional table or the printed output, the details of the run and
 the complete source. It also writes the listing, and one page per code and per kind that lists the studies
 using that code or of that kind.
@@ -29,6 +29,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
+from gallery_tools import figures as web_figures
 from gallery_tools.config import Gallery, GalleryError
 from gallery_tools.study import KINDS, Study, discover
 
@@ -215,6 +216,20 @@ class Site:
         return rows
 
 
+PLOTLY_FIGURE = "import PlotlyFigure from '@max-models/starlight-theme/components/PlotlyFigure.astro';"
+
+
+def figure_tag(site: Site, study: Study, written: web_figures.Written, alt: str) -> str:
+    """The figure on the page: an interactive web figure, else its picture."""
+    url = f"/studies/{study.slug}"
+    if written.web:
+        attributes = [f'src="{url}/{written.web}"']
+        attributes += [f'{k}="{url}/{v}"' for k, v in written.posters.items()]
+        attributes.append(f"alt={json.dumps(alt)}")
+        return f"<PlotlyFigure {' '.join(attributes)} />"
+    return f"![{alt}]({site.base}{url}/{written.picture})"
+
+
 def build_study(
     site: Site,
     study: Study,
@@ -258,21 +273,20 @@ def build_study(
         try:
             os.chdir(study.folder)
             with contextlib.redirect_stdout(printed):
-                namespace["plot"](result)
+                returned = namespace["plot"](result)
                 table = namespace["table"](result) if "table" in namespace else ""
         finally:
             os.chdir(previous)
-        figures = [plt.figure(number) for number in plt.get_fignums()]
+        figures = web_figures.collect(returned)
         output.mkdir(parents=True)
         for index, (figure, caption) in enumerate(
             zip(figures, study.captions(figures), strict=True), start=1
         ):
-            filename = f"plot-{index}.png"
-            figure.savefig(output / filename, dpi=150, bbox_inches="tight")
+            alt = f"{study.title}, figure {index}"
+            written = web_figures.write(figure, output / f"plot-{index}", alt)
             text = sanitize_markdown(caption) if caption else ""
             figures_part += [
-                f"![{study.title}, figure {index}]"
-                f"({site.base}/studies/{study.slug}/{filename})",
+                figure_tag(site, study, written, alt),
                 "",
                 f"**Figure {index}.** {text}".rstrip(),
                 "",
@@ -290,6 +304,7 @@ def build_study(
         text = printed.getvalue().strip()
         if text and not table:
             results_part += ["## Printed output", "", "```text", text, "```", ""]
+    web = any("<PlotlyFigure" in line for line in figures_part)
     page = [
         "---",
         f"title: {json.dumps(study.title)}",
@@ -298,6 +313,7 @@ def build_study(
         f"  order: {study.order}",
         "---",
         "",
+        *([PLOTLY_FIGURE, ""] if web else []),
         sanitize_markdown(intro),
         "",
         *figures_part,

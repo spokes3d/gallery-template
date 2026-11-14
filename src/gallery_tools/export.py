@@ -56,6 +56,9 @@ SKELETON = {
     "gitignore": ".gitignore",
     "tests/test_studies.py": "tests/test_studies.py",
 }
+#: The docs extra of the public gallery: a Jupyter kernel for the shared docs workflow, and
+#: plasma-plots and kaleido for the web figures (gallery_tools.figures).
+DOCS_REQUIREMENTS = ("ipykernel", "kaleido", "plasma-plots[web]")
 #: Import names whose distribution is not the import name with dashes.
 DISTRIBUTIONS = {"yaml": "pyyaml", "PIL": "pillow", "sklearn": "scikit-learn"}
 
@@ -149,7 +152,9 @@ def pyproject(gallery: Gallery, studies: list[Study]) -> str:
         f"  {_toml_string(public.tools)},",
         *[f"  {_toml_string(r)}," for r in requires],
         "]",
-        'optional-dependencies.docs = [ "ipykernel" ]',
+        "optional-dependencies.docs = [",
+        *[f"  {_toml_string(r)}," for r in DOCS_REQUIREMENTS],
+        "]",
         'optional-dependencies.test = [ "pytest" ]',
         "",
         "[tool.setuptools]",
@@ -159,7 +164,8 @@ def pyproject(gallery: Gallery, studies: list[Study]) -> str:
         'ini_options.testpaths = [ "tests" ]',
         'ini_options.addopts = "-ra"',
     ]
-    used = {k: v for k, v in sources.items() if k in requires}
+    names = set(requires) | {r.split("[")[0] for r in DOCS_REQUIREMENTS}
+    used = {k: v for k, v in sources.items() if k in names}
     if used:
         lines += ["", "[tool.uv.sources]"]
         lines += [f"{k} = {_toml_inline(v)}" for k, v in sorted(used.items())]
