@@ -36,6 +36,12 @@ public:
   overlay: public   # files copied into the public repository, e.g. its home page
 ```
 
+Codes that are built from source need system packages in the public workflows: list them as
+`apt_packages` under `public:` (e.g. `apt_packages: [gfortran, cmake]`), and the exported Tests
+and Docs workflows install them. The public `pyproject.toml` lists the codes the public studies
+use; a code that the private `pyproject.toml` declares with an environment marker (say
+`"slowcooker; python_version>='3.12'"`) keeps the marker there.
+
 Once:
 
 1. Create the public repository, empty, and give it a `devel` branch.

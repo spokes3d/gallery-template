@@ -27,6 +27,9 @@ class Public:
     tools: str = (
         "gallery-tools @ git+https://github.com/spokes3d/gallery-template@devel"
     )
+    #: Ubuntu packages the public workflows install before the codes, e.g. a Fortran
+    #: compiler for codes that are built from source.
+    apt_packages: list[str] = field(default_factory=list)
 
 
 @dataclass
