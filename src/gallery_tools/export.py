@@ -39,6 +39,7 @@ from gallery_tools.study import (
     discover,
     distribution_name,
     local_modules,
+    module_name,
 )
 
 DOCS_FILES = (
@@ -91,13 +92,18 @@ def _excluded(study: Study, path: Path) -> bool:
 
 
 def _requirements(gallery: Gallery, studies: list[Study]) -> list[str]:
-    """The distributions the public studies need."""
+    """The distributions the public studies need, without the private codes.
+
+    A private code cannot be installed from the public repository; the examples that use it
+    show their cached results, and their smoke run is skipped there.
+    """
     names = {c for s in studies for c in s.codes}
     for study in studies:
         names |= {
             DISTRIBUTIONS.get(m, distribution_name(m)) for m in study.third_party()
         }
-    return sorted(names, key=str.lower)
+    private = {module_name(c) for c in gallery.private_codes}
+    return sorted((n for n in names if module_name(n) not in private), key=str.lower)
 
 
 def _source_commit(root: Path) -> str:

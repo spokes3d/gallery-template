@@ -14,8 +14,9 @@ against it:
 
 - a `result` (a novel result a paper will use) needs its `preprint`; verification, method,
   example and benchmark studies may go at once;
-- it uses none of the `private_codes` of `gallery.yml`, so the public site and its CI need no
-  access to private repositories;
+- it uses none of the `private_codes` of `gallery.yml`, unless it is an `example`: the public
+  repository cannot install a private code, so it is left out of the public `pyproject.toml`,
+  the page shows the cached result and the public CI skips the example's smoke run;
 - it imports no helper module of the repository, since only its folder is copied;
 - it is not a stub.
 

@@ -213,6 +213,21 @@ def test_public_problems(gallery):
         export(gallery, gallery.root.parent / "public")
 
 
+def test_a_public_example_may_use_a_private_code(gallery):
+    script = SCRIPT + "\nimport secretcode\n"
+    folder = write_study(
+        gallery.root, "07_example", script=script, kind="example", public=True
+    )
+    study = Study(folder)
+    assert study.private_codes(gallery) == {"secretcode"}
+    assert study.public_problems(gallery, local_modules(gallery)) == []
+    # the private code is not a dependency of the public gallery
+    target = gallery.root.parent / "public"
+    export(gallery, target)
+    assert "secretcode" not in (target / "pyproject.toml").read_text()
+    assert (target / "studies" / "07_example" / "study.py").exists()
+
+
 def test_build(gallery, capsys):
     built = build(gallery)  # runs the simulations: nothing is cached yet
     assert [s.stem for s in built] == ["01_squares", "02_private", "03_stub"]
