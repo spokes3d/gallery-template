@@ -45,6 +45,11 @@ OPTIONAL = (
 )
 
 
+#: The kinds of study that may use a private code and still go public: their page shows the
+#: cached result, and the public CI skips their smoke run.
+PRIVATE_CODE_KINDS = frozenset({"example", "verification"})
+
+
 def module_name(distribution: str) -> str:
     """The import name of a distribution, by convention (``plasma-plots`` -> ``plasma_plots``)."""
     return distribution.replace("-", "_").lower()
@@ -221,10 +226,11 @@ class Study:
                 "a study of kind 'result' needs its `preprint` before it is public"
             )
         used = self.private_codes(gallery)
-        if used and self.kind != "example":
+        if used and self.kind not in PRIVATE_CODE_KINDS:
             out.append(
-                f"uses private codes {sorted(used)} (only an example may: its page shows "
-                "the cached result, and the public CI skips its smoke run)"
+                f"uses private codes {sorted(used)} (only an example or a verification "
+                "may: its page shows the cached result, and the public CI skips its "
+                "smoke run)"
             )
         own = {p.stem for p in self.folder.rglob("*.py")} | {
             p.name for p in self.folder.iterdir() if p.is_dir()

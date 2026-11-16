@@ -228,6 +228,14 @@ def test_a_public_example_may_use_a_private_code(gallery):
     assert (target / "studies" / "07_example" / "study.py").exists()
 
 
+def test_a_public_verification_may_use_a_private_code(gallery):
+    script = SCRIPT + "\nimport secretcode\n"
+    folder = write_study(
+        gallery.root, "08_check", script=script, kind="verification", public=True
+    )
+    assert Study(folder).public_problems(gallery, local_modules(gallery)) == []
+
+
 def test_build(gallery, capsys):
     built = build(gallery)  # runs the simulations: nothing is cached yet
     assert [s.stem for s in built] == ["01_squares", "02_private", "03_stub"]
