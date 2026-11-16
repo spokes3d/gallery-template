@@ -265,14 +265,19 @@ def test_build(gallery, capsys):
     )
     assert (site.public / "squares" / "plot-1.png").exists()
     assert "in development, not run" in (site.studies / "stub.mdx").read_text()
-    index = (site.studies / "index.md").read_text()
+    index = (site.studies / "index.mdx").read_text()
     assert "[Example](/private-gallery/by-kind/example/)" in index
-    assert (site.content / "by-code" / "numpy.md").exists()
-    assert (site.content / "by-kind" / "result.md").exists()
+    # the gallery: a card per study with its front figure, the stub's without one
+    assert "import GalleryGrid" in index
     assert (
-        "Studies with secretcode"
-        in (site.content / "by-code" / "secretcode.md").read_text()
+        '"thumbnail": {"kind": "plotly", "src": "/studies/squares/plot-1.plotly.json"}'
+        in index
     )
+    assert '"placeholder": "in development"' in index
+    assert (site.content / "by-code" / "numpy.mdx").exists()
+    assert (site.content / "by-kind" / "result.mdx").exists()
+    by_code = (site.content / "by-code" / "secretcode.mdx").read_text()
+    assert "Studies with secretcode" in by_code and "<GalleryGrid" in by_code
     # cached now: a partial build with --cached-only does not run anything
     build(gallery, ["01_squares"], cached_only=True)
     assert "cached full result" in capsys.readouterr().out
@@ -293,7 +298,7 @@ def test_build_table_and_intro(gallery):
     site = Site(gallery)
     page = (site.studies / "table.mdx").read_text()
     assert "## Comparison" in page and "Printed output" not in page
-    assert "Our own introduction." in (site.studies / "index.md").read_text()
+    assert "Our own introduction." in (site.studies / "index.mdx").read_text()
 
 
 def test_export(gallery, tmp_path):
@@ -489,3 +494,23 @@ def test_without_plasma_plots_a_figure_is_a_picture(gallery, monkeypatch):
     build(gallery, ["01_squares"])
     page = (Site(gallery).studies / "squares.mdx").read_text()
     assert "](/private-gallery/studies/squares/plot-1.png)" in page
+
+
+def test_front_figure(gallery):
+    script = SCRIPT + "\n    plt.figure()\n    plt.plot(result['y'], result['x'])\n"
+    write_study(
+        gallery.root, "08_two", script=script, figures=["one", "two"], front_figure=2
+    )
+    build(gallery, ["08_two"], rerun=["08_two"])
+    assert (
+        "/studies/two/plot-2.plotly.json"
+        in (Site(gallery).studies / "index.mdx").read_text()
+    )
+
+
+def test_front_figure_errors(gallery):
+    folder = write_study(gallery.root, "09_bad", front_figure=0)
+    assert any("front_figure" in p for p in Study(folder).problems(gallery))
+    write_study(gallery.root, "10_far", front_figure=3)
+    with pytest.raises(GalleryError, match="front_figure 3"):
+        build(gallery, ["10_far"], rerun=["10_far"])

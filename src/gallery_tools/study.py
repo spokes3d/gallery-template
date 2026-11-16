@@ -41,6 +41,7 @@ OPTIONAL = (
     "runtime",
     "stub",
     "figures",
+    "front_figure",
     "exclude",
 )
 
@@ -123,6 +124,12 @@ class Study:
         return str(self.meta.get("docs_preset", "quick"))
 
     @property
+    def front_figure(self) -> int:
+        """The number of the figure on the study's card in the gallery (from 1)."""
+        value = self.meta.get("front_figure", 1)
+        return value if isinstance(value, int) and not isinstance(value, bool) else 1
+
+    @property
     def summary(self) -> str:
         """One sentence for the listing and the page description."""
         if self.meta.get("summary"):
@@ -200,6 +207,9 @@ class Study:
                 out.append(
                     f"docs_preset {self.preset!r} is not in PRESETS {self.presets}"
                 )
+            front = self.meta.get("front_figure", 1)
+            if isinstance(front, bool) or not isinstance(front, int) or front < 1:
+                out.append("study.yml: `front_figure` must be a figure number, from 1")
             if not isinstance(self.meta.get("figures", []), list):
                 out.append("study.yml: `figures` must be a list, a caption per figure")
         return out
