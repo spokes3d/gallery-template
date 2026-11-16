@@ -353,6 +353,39 @@ def test_export(gallery, tmp_path):
     assert not discover(public)[0].problems(public)
 
 
+def test_export_markers_and_system_packages(gallery, tmp_path):
+    config = yaml.safe_load((gallery.root / "gallery.yml").read_text())
+    config["public"]["apt_packages"] = ["gfortran", "cmake"]
+    (gallery.root / "gallery.yml").write_text(yaml.safe_dump(config))
+    pyproject = gallery.root / "pyproject.toml"
+    pyproject.write_text(
+        pyproject.read_text().replace(
+            'requires-python = ">=3.11"\n',
+            'requires-python = ">=3.11"\n'
+            "optional-dependencies.new = [ \"NumPy[fast]; python_version>='3.12'\" ]\n",
+        )
+    )
+    target = tmp_path / "public"
+    export(load(gallery.root), target)
+    project = tomllib.loads((target / "pyproject.toml").read_text())["project"]
+    # the code keeps the marker of the private gallery, so the public project resolves
+    assert "numpy; python_version>='3.12'" in project["dependencies"]
+    assert "matplotlib" in project["dependencies"]
+    tests = yaml.safe_load((target / ".github" / "workflows" / "tests.yml").read_text())
+    steps = tests["jobs"]["studies"]["steps"]
+    assert steps[1]["run"].endswith("apt-get install -y gfortran cmake")
+    assert steps[2]["uses"].startswith("astral-sh/setup-uv")
+    docs = yaml.safe_load((target / ".github" / "workflows" / "docs.yml").read_text())
+    assert docs["jobs"]["docs"]["with"]["apt-packages"] == "gfortran cmake"
+    assert "apt_packages" not in (target / "gallery.yml").read_text()
+
+
+def test_export_without_system_packages(gallery, tmp_path):
+    export(gallery, tmp_path / "public")
+    tests = (tmp_path / "public" / ".github" / "workflows" / "tests.yml").read_text()
+    assert "apt-get" not in tests
+
+
 def test_export_keeps_links_to_public_pages(gallery, tmp_path):
     pages = gallery.root / "public" / "docs" / "src" / "content" / "docs"
     pages.mkdir(parents=True)
