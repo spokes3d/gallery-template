@@ -10,8 +10,8 @@ the cached results, so CI never reruns a long simulation.
 
 A project keeps every study in a **private gallery** and publishes some of them in a **public
 gallery**, generated from the private one: a study marked `public: true` goes there as a pull
-request, once it meets the rules (a novel result needs its preprint, private codes only in examples,
-no helper modules).
+request, once it meets the rules (a novel result needs its preprint, private codes only in
+examples and verifications, no helper modules).
 
 Documentation: <https://spokes3d.github.io/gallery-template/>
 
