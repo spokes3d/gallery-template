@@ -199,6 +199,11 @@ class Study:
                 out.append("study.yml: `figures` must be a list, a caption per figure")
         return out
 
+    def private_codes(self, gallery: Gallery) -> set[str]:
+        """The private codes of the gallery the study uses (module names)."""
+        private = {module_name(c) for c in gallery.private_codes}
+        return (self.third_party() | {module_name(c) for c in self.codes}) & private
+
     def public_problems(self, gallery: Gallery, local_modules: set[str]) -> list[str]:
         """Why the study cannot go to the public gallery (empty when it can).
 
@@ -215,10 +220,12 @@ class Study:
             out.append(
                 "a study of kind 'result' needs its `preprint` before it is public"
             )
-        private = {module_name(c) for c in gallery.private_codes}
-        used = (self.third_party() | {module_name(c) for c in self.codes}) & private
-        if used:
-            out.append(f"uses private codes {sorted(used)}")
+        used = self.private_codes(gallery)
+        if used and self.kind != "example":
+            out.append(
+                f"uses private codes {sorted(used)} (only an example may: its page shows "
+                "the cached result, and the public CI skips its smoke run)"
+            )
         own = {p.stem for p in self.folder.rglob("*.py")} | {
             p.name for p in self.folder.iterdir() if p.is_dir()
         }
