@@ -61,6 +61,11 @@ each with its caption, then the status and the rest of the text. A figure's capt
 one. Write the caption to be read without the text: what is plotted against what, and what to
 see in it. The builder runs the script in its folder, so relative paths start there.
 
+The Studies page is a gallery, the theme's `GalleryGrid`: a card per study, under its category,
+with its front figure (the first unless `front_figure` in `study.yml` names another), title,
+kind, codes and summary, and a filter box. Pick the figure that shows the study at a glance and
+reads at the size of a card. The pages per kind and per code show their studies the same way.
+
 ### Web figures
 
 **Web figures are the standard: draw every figure so that it can be one.** The builder turns each
@@ -106,6 +111,7 @@ status: >-                   # what it verifies and what it does not, honestly
   Not a verification: ...
 figures:                     # captions, in the order plot draws the figures, for
   - caption of figure 1      # figures without their own (plain Matplotlib)
+front_figure: 2              # the figure on the study's card in the gallery (default 1)
 exclude: [data/raw/]         # files that stay private when the study is published
 stub: false                  # announced, not yet run: no simulate and plot needed
 ```

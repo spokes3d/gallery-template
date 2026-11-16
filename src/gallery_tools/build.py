@@ -5,8 +5,9 @@ of its docs preset from the cache in ``studies/<stem>/results/`` (or runs it and
 cache), draws the figures with the script's ``plot`` function (as web figures where it can, see
 ``gallery_tools.figures``) and writes a page led by the figures: the first paragraph of the description, the figures with their captions, the status,
 the rest of the description, an optional table or the printed output, the details of the run and
-the complete source. It also writes the listing, and one page per code and per kind that lists the studies
-using that code or of that kind.
+the complete source. It also writes the listing, a gallery of cards (the theme's ``GalleryGrid``)
+with each study's front figure (``front_figure`` of ``study.yml``, the first by default), and one
+page per code and per kind that shows the studies using that code or of that kind the same way.
 
 A simulation is run only when there is no cached result for its preset, or when it is asked for
 with ``rerun``; a long run is therefore done once, by hand, and its result is committed.
@@ -278,6 +279,11 @@ def build_study(
         finally:
             os.chdir(previous)
         figures = web_figures.collect(returned)
+        if figures and study.front_figure > len(figures):
+            raise GalleryError(
+                f"{study.stem}: front_figure {study.front_figure}, but plot draws "
+                f"{len(figures)} figures"
+            )
         output.mkdir(parents=True)
         for index, (figure, caption) in enumerate(
             zip(figures, study.captions(figures), strict=True), start=1
@@ -340,29 +346,41 @@ def build_study(
     print(f"[studies] {study.stem} -> {site.studies / study.slug}.mdx")
 
 
+GALLERY_GRID = "import GalleryGrid from '@max-models/starlight-theme/components/GalleryGrid.astro';"
+
+
+def thumbnail(site: Site, study: Study) -> dict[str, str] | None:
+    """The front figure of a study for its card: the web figure, else its picture."""
+    folder = site.public / study.slug
+    stem = f"plot-{study.front_figure}"
+    for name, kind in ((f"{stem}.plotly.json", "plotly"), (f"{stem}.png", "png")):
+        if (folder / name).exists():
+            return {"kind": kind, "src": f"/studies/{study.slug}/{name}"}
+    return None
+
+
+def card(site: Site, study: Study) -> dict[str, Any]:
+    """The card of a study in the gallery (an item of the theme's ``GalleryGrid``)."""
+    kind = KINDS.get(study.kind, study.kind)
+    codes = ", ".join(site.all_codes(study)) or "no codes"
+    return {
+        "title": study.title,
+        "summary": f"{kind} · {codes}. {study.summary}",
+        "href": f"/studies/{study.slug}/",
+        "group": str(study.meta.get("category", "Other")),
+        "thumbnail": thumbnail(site, study),
+        "placeholder": "in development" if study.stub else "no figure",
+    }
+
+
 def listing(site: Site, studies: list[Study]) -> list[str]:
-    """A table of studies, grouped by category."""
-    lines: list[str] = []
-    categories: dict[str, list[Study]] = {}
-    for study in studies:
-        categories.setdefault(str(study.meta.get("category", "Other")), []).append(
-            study
-        )
-    for category, members in categories.items():
-        lines += [
-            f"## {category}",
-            "",
-            "| Study | Kind | Codes | State |",
-            "|---|---|---|---|",
-        ]
-        for s in members:
-            state = "in development" if s.stub else "has results"
-            codes = ", ".join(site.code_link(c) for c in site.all_codes(s)) or "none"
-            lines.append(
-                f"| [{s.title}]({site.study_link(s)}) | {site.kind_link(s.kind)} | {codes} | {state} |"
-            )
-        lines.append("")
-    return lines
+    """A gallery of the studies: a card each with its front figure, grouped by category."""
+    items = json.dumps([card(site, s) for s in studies], ensure_ascii=False)
+    # braces in the JSON are inside the expression, so MDX reads them as code
+    return [
+        f'<GalleryGrid items={{{items}}} filterLabel="Filter studies…" />',
+        "",
+    ]
 
 
 def write_index(site: Site, studies: list[Study], intro: str = "") -> None:
@@ -389,13 +407,16 @@ def write_index(site: Site, studies: list[Study], intro: str = "") -> None:
         "  order: 0",
         "---",
         "",
-        text,
+        GALLERY_GRID,
+        "",
+        sanitize_markdown(text),
         "",
         *filters,
         *listing(site, studies),
     ]
     site.studies.mkdir(parents=True, exist_ok=True)
-    (site.studies / "index.md").write_text("\n".join(lines))
+    (site.studies / "index.md").unlink(missing_ok=True)  # the listing of older builds
+    (site.studies / "index.mdx").write_text("\n".join(lines))
     for folder, keys, member, label in (
         ("by-code", codes, lambda s, c: c in site.all_codes(s), "use"),
         ("by-kind", kinds, lambda s, k: s.kind == k, "kind"),
@@ -417,11 +438,13 @@ def write_index(site: Site, studies: list[Study], intro: str = "") -> None:
                 f"description: {json.dumps(lead)}",
                 "---",
                 "",
+                GALLERY_GRID,
+                "",
                 f"{lead} [All studies]({site.base}/studies/).",
                 "",
                 *listing(site, members),
             ]
-            (target / f"{slugify(key)}.md").write_text("\n".join(page))
+            (target / f"{slugify(key)}.mdx").write_text("\n".join(page))
 
 
 def build(
