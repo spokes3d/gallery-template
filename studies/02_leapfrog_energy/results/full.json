@@ -1,0 +1,17 @@
+{
+  "preset": "full",
+  "wall_seconds": 0.2,
+  "ran_at": "2026-11-19T13:10:26+00:00",
+  "python": "3.13.18",
+  "codes": {
+    "matplotlib": {
+      "version": "3.11.2"
+    },
+    "numpy": {
+      "version": "2.5.5"
+    }
+  },
+  "toolchain": {
+    "C": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+  }
+}

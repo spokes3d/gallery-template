@@ -95,6 +95,55 @@ def plot(result: dict):
     return FuncAnimation(fig, update, frames=len(result["phi"]))
 ```
 
+## Other languages
+
+A study may be written in C, C++, Fortran or Julia. Its sources go into the study's folder, and
+`study.py` stays the entry point: `simulate` runs the program with `gallery_tools.native.run`
+and reads what it wrote, and `plot` draws the figures in Python, from the cached result as for
+any other study.
+
+```python
+import io
+
+import numpy as np
+from gallery_tools import native
+
+
+def simulate(preset: str = "quick") -> dict:
+    printed = native.run("decay.f90", PRESETS[preset]["steps"])  # the arguments
+    return {"data": np.loadtxt(io.StringIO(printed))}
+```
+
+`native.run(sources, *args)` returns what the program printed, and raises with the program's
+own messages when the build or the run fails.
+
+| Language | Files | Run with | Chosen by |
+|---|---|---|---|
+| C | `.c` (`.h`) | `cc`, `gcc` or `clang`, `-O2`, linked with `-lm` | `CC` |
+| C++ | `.cpp`, `.cc`, `.cxx` (`.hpp`) | `c++`, `g++` or `clang++`, `-O2` | `CXX` |
+| Fortran | `.f90`, `.f95`, `.f03`, `.f08`, `.f` | `gfortran`, `flang` or `ifx`, `-O2` | `FC` |
+| Julia | `.jl` | `julia --startup-file=no` | `JULIA` |
+
+- **Several files**: pass a list in the order the compiler needs, a Fortran module before the
+  program that uses it: `native.run(["grid.f90", "main.f90"], 64)`. Headers may be listed too.
+- **Flags**: `flags=["-O3", "-fopenmp"]` replaces the defaults; `env={"OMP_NUM_THREADS": "4"}`
+  adds environment variables, `stdin="..."` feeds the program, `timeout=` stops it.
+- **Output files**: `cwd=` is where the program runs. For a program that writes files, run it
+  in a `tempfile.TemporaryDirectory()` and read them there into the result.
+- **Julia packages**: a `Project.toml` next to the script is used as its project (commit the
+  `Manifest.toml` as well, and instantiate it once with `julia --project=. -e "using Pkg;
+  Pkg.instantiate()"`).
+- A compiled program is built once and kept in the temporary folder of the machine until a
+  source, a flag or the compiler changes.
+
+List the sources under `sources` in `study.yml` (files or globs, in the order to show): the
+page shows each after `study.py`, highlighted in its language, and the versions of the compilers
+are recorded with the result and shown in the details. The docs build needs no compiler, since
+it reads the cached result; the smoke test does, and is skipped with a message where the
+compiler or Julia is missing. GitHub's Ubuntu runners have `gcc`, `gfortran` and `julia`; other
+system packages for the public gallery's workflows go into `apt_packages` under `public` in
+`gallery.yml`. The example is `studies/02_leapfrog_energy` of the template.
+
 ## study.yml
 
 ```yaml
@@ -112,6 +161,7 @@ status: >-                   # what it verifies and what it does not, honestly
 figures:                     # captions, in the order plot draws the figures, for
   - caption of figure 1      # figures without their own (plain Matplotlib)
 front_figure: 2              # the figure on the study's card in the gallery (default 1)
+sources: [solver.f90]        # programs in C, Fortran or Julia the page shows (Other languages)
 exclude: [data/raw/]         # files that stay private when the study is published
 stub: false                  # announced, not yet run: no simulate and plot needed
 ```

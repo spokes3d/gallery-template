@@ -21,6 +21,7 @@ import pytest
 
 from gallery_tools.config import load
 from gallery_tools.figures import collect
+from gallery_tools.native import ToolchainError
 from gallery_tools.study import Study, discover, local_modules
 
 __all__ = [
@@ -88,6 +89,8 @@ def test_study_runs_in_smoke_preset(study: Study):
             result = namespace["simulate"]("smoke")
         except ImportError as error:  # codes a study imports only when it runs
             pytest.skip(f"a code the study needs is not installed: {error}")
+        except ToolchainError as error:  # a compiler, or Julia
+            pytest.skip(str(error))
         pickle.loads(pickle.dumps(result, protocol=4))  # the cache stores it
         plt.close("all")
         returned = namespace["plot"](result)
