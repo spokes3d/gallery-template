@@ -103,8 +103,10 @@ def _requirements(gallery: Gallery, studies: list[Study]) -> list[str]:
         names |= {
             DISTRIBUTIONS.get(m, distribution_name(m)) for m in study.third_party()
         }
-    private = {module_name(c) for c in gallery.private_codes}
-    return sorted((n for n in names if module_name(n) not in private), key=str.lower)
+    # the tools are a dependency already (`public.tools`): a study imports them for
+    # `gallery_tools.native`
+    skip = {module_name(c) for c in gallery.private_codes} | {"gallery_tools"}
+    return sorted((n for n in names if module_name(n) not in skip), key=str.lower)
 
 
 def _normalized(name: str) -> str:

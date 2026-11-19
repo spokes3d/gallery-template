@@ -43,6 +43,7 @@ OPTIONAL = (
     "figures",
     "front_figure",
     "exclude",
+    "sources",
 )
 
 
@@ -137,6 +138,24 @@ class Study:
         first = self.description.split("\n\n", 1)[0].replace("\n", " ")
         return first.split(". ")[0] if first else self.title
 
+    @property
+    def sources(self) -> list[Path]:
+        """The other source files the page shows (``sources`` of ``study.yml``), in order.
+
+        An entry is a file of the study's folder or a glob (``src/*.f90``), for the program in
+        C, Fortran or Julia that ``study.py`` runs (see ``gallery_tools.native``).
+        """
+        listed = self.meta.get("sources") or []
+        out: list[Path] = []
+        for entry in listed if isinstance(listed, list) else []:
+            found = sorted(
+                p
+                for p in self.folder.glob(str(entry))
+                if p.is_file() and p.resolve().is_relative_to(self.folder.resolve())
+            )
+            out += [p for p in found if p not in out and p != self.source]
+        return out
+
     def captions(self, figures: list[Any]) -> list[str | None]:
         """The caption of each figure ``plot`` drew, None where it has none.
 
@@ -200,6 +219,18 @@ class Study:
             out.append("public must be true or false")
         if not isinstance(self.meta.get("codes", []), list):
             out.append("codes must be a list")
+        listed = self.meta.get("sources") or []
+        if not isinstance(listed, list):
+            out.append("study.yml: `sources` must be a list of files of the study")
+        else:
+            for entry in listed:
+                inside = (
+                    (self.folder / str(entry))
+                    .resolve()
+                    .is_relative_to(self.folder.resolve())
+                )
+                if not inside or not any(self.folder.glob(str(entry))):
+                    out.append(f"study.yml: `sources`: no file {entry!r} in the study")
         if not self.stub:
             if "smoke" not in self.presets:
                 out.append("PRESETS needs a 'smoke' preset (the test runs it)")

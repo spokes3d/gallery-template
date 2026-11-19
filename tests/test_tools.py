@@ -547,3 +547,175 @@ def test_front_figure_errors(gallery):
     write_study(gallery.root, "10_far", front_figure=3)
     with pytest.raises(GalleryError, match="front_figure 3"):
         build(gallery, ["10_far"], rerun=["10_far"])
+
+
+C_PROGRAM = """
+#include <stdio.h>
+#include <stdlib.h>
+#include "scale.h"
+int main(int argc, char **argv) {
+  char line[32] = "0";
+  if (argc < 2) { fprintf(stderr, "no count\\n"); return 3; }
+  fgets(line, sizeof line, stdin);
+  for (int i = 0; i < atoi(argv[1]); i++) printf("%d\\n", SCALE * i * i + atoi(line));
+  return 0;
+}
+"""
+
+NATIVE_SCRIPT = '''
+"""Squares in C.
+
+A program in C squares the numbers.
+"""
+
+import matplotlib.pyplot as plt
+
+from gallery_tools import native
+
+PRESETS = {"smoke": 3, "full": 5}
+
+
+def simulate(preset="full"):
+    printed = native.run(["scale.h", "squares.c"], PRESETS[preset])
+    return {"y": [int(line) for line in printed.split()]}
+
+
+def plot(result):
+    plt.plot(result["y"])
+'''
+
+
+def write_native_study(root: Path, stem: str = "08_native", **meta) -> Path:
+    """A study whose program is in C, with a header."""
+    folder = write_study(
+        root, stem, script=NATIVE_SCRIPT, sources=["*.c", "scale.h", "*.c"], **meta
+    )
+    (folder / "squares.c").write_text(C_PROGRAM)
+    (folder / "scale.h").write_text("#define SCALE 2\n")
+    return folder
+
+
+def test_native_runs_a_c_program(tmp_path, monkeypatch):
+    from gallery_tools import native
+
+    monkeypatch.setattr(native.tempfile, "gettempdir", lambda: str(tmp_path / "tmp"))
+    folder = write_native_study(tmp_path)
+    monkeypatch.chdir(folder)
+    assert native.run(["scale.h", "squares.c"], 3).split() == ["0", "2", "8"]
+    executable = native.build(["scale.h", "squares.c"])
+    built = executable.stat().st_mtime_ns
+    # kept until a source, a header or a flag changes
+    assert native.build(["scale.h", "squares.c"]).stat().st_mtime_ns == built
+    assert native.build(["scale.h", "squares.c"], flags=["-O0"]) != executable
+    (folder / "scale.h").write_text("#define SCALE 3\n")
+    assert native.run(
+        ["scale.h", "squares.c"], 3, stdin="1\n", cwd=tmp_path
+    ).split() == [
+        "1",
+        "4",
+        "13",
+    ]
+    assert native.run(["scale.h", "squares.c"], 1, env={"A": "b"}) == "0\n"
+    with pytest.raises(GalleryError, match="(?s)running squares.c failed.*no count"):
+        native.run(["scale.h", "squares.c"])
+    (folder / "broken.c").write_text("int main( {")
+    with pytest.raises(GalleryError, match="compiling broken.c failed"):
+        native.run("broken.c")
+    with pytest.raises(GalleryError, match="no source file"):
+        native.run("missing.c")
+    (folder / "other.jl").write_text("")
+    with pytest.raises(GalleryError, match="one language"):
+        native.run(["squares.c", "other.jl"])
+    with pytest.raises(GalleryError, match="one language"):
+        native.run("study.yml")
+    with pytest.raises(GalleryError, match="not compiled"):
+        native.build("other.jl")
+
+
+def test_native_languages_and_toolchain(tmp_path, monkeypatch):
+    from gallery_tools import native
+
+    assert native.language_of("a/solver.F90").name == "Fortran"
+    assert native.language_of("notes.txt") is None
+    fences = {
+        "main.cpp": "cpp",
+        "a.h": "c",
+        "run.jl": "julia",
+        "Makefile": "makefile",
+        "Project.toml": "toml",
+        "data.dat": "text",
+    }
+    assert {name: native.fence_of(name) for name in fences} == fences
+    # an interpreter: a stand-in for julia that echoes its command line
+    fake = tmp_path / "fakejulia"
+    fake.write_text('#!/bin/sh\necho "$@"\n')
+    fake.chmod(0o755)
+    monkeypatch.setenv("JULIA", f"{fake} --threads=2")
+    script = tmp_path / "model.jl"
+    script.write_text("")
+    assert native.run(script, 4).split() == [
+        "--threads=2",
+        "--startup-file=no",
+        str(script),
+        "4",
+    ]
+    (tmp_path / "Project.toml").write_text("")
+    assert f"--project={tmp_path}" in native.run(script, flags=[])
+    assert native.toolchain([script, script, "x.txt"]) == {
+        "Julia": "--threads=2 --version"
+    }
+    # nothing installed: an error that says what to do, and no record
+    monkeypatch.setenv("JULIA", "no-such-julia")
+    with pytest.raises(native.ToolchainError, match="no Julia interpreter.*set JULIA"):
+        native.run(script)
+    assert native.toolchain([script]) == {}
+    monkeypatch.delenv("JULIA")
+    monkeypatch.setattr(native.shutil, "which", lambda name: None)
+    with pytest.raises(native.ToolchainError, match="tried gfortran, flang, ifx"):
+        native.command(native.LANGUAGES["fortran"])
+    silent = tmp_path / "silent"
+    silent.write_text("#!/bin/sh\n")
+    silent.chmod(0o755)
+    monkeypatch.undo()
+    monkeypatch.setenv("FC", str(silent))
+    assert native.version(native.LANGUAGES["fortran"]) == "unknown"
+
+
+def test_a_study_in_another_language(gallery, tmp_path, monkeypatch):
+    from gallery_tools import native
+
+    monkeypatch.setattr(native.tempfile, "gettempdir", lambda: str(tmp_path / "tmp"))
+    folder = write_native_study(gallery.root, public=True)
+    study = Study(folder)
+    assert [p.name for p in study.sources] == ["squares.c", "scale.h"]
+    assert not study.problems(gallery)
+    assert not study.public_problems(gallery, local_modules(gallery))
+    build(gallery, ["08_native"])
+    assert "C" in json.loads(study.cache("full")[1].read_text())["toolchain"]
+    page = (Site(gallery).studies / "native.mdx").read_text()
+    assert "| Compilers | C: " in page
+    assert "## C source: `squares.c`" in page and "```c\n" in page
+    assert page.index("## Python source") < page.index("## C source: `scale.h`")
+    (folder / "notes.txt").write_text("plain")
+    meta = yaml.safe_load((folder / "study.yml").read_text())
+    (folder / "study.yml").write_text(yaml.safe_dump(meta | {"sources": ["notes.txt"]}))
+    build(gallery, ["08_native"])
+    page = (Site(gallery).studies / "native.mdx").read_text()
+    assert "## Source: `notes.txt`" in page and "```text\nplain" in page
+    # the sources are published with the study, and the tools are not required twice
+    target = tmp_path / "public"
+    export(gallery, target)
+    assert (target / "studies" / "08_native" / "squares.c").exists()
+    project = tomllib.loads((target / "pyproject.toml").read_text())["project"]
+    assert sum("gallery-tools" in d for d in project["dependencies"]) == 1
+    # what `sources` must be
+    for sources, message in (
+        ("squares.c", "must be a list"),
+        (["missing.f90"], "no file 'missing.f90'"),
+        (["../../gallery.yml"], "no file '../../gallery.yml'"),
+    ):
+        meta = yaml.safe_load((folder / "study.yml").read_text())
+        meta["sources"] = sources
+        (folder / "study.yml").write_text(yaml.safe_dump(meta))
+        assert message in " ".join(Study(folder).problems(gallery))
+        assert Study(folder).sources == []

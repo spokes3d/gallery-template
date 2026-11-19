@@ -1,0 +1,18 @@
+# A study whose program is written in C: study.py compiles it, runs it and plots its output.
+category: Time integration
+kind: example
+public: true
+codes: [numpy]
+sources: [oscillator.c]  # shown on the page after study.py; the compiler is recorded
+docs_preset: full
+runtime: well under a second
+summary: The energy error of three integrators of the harmonic oscillator, computed in C.
+status: >-
+  An example of a study in another language. The explicit Euler method gains energy every
+  step; the symplectic Euler and the leapfrog method keep the error bounded over the 20
+  periods shown, which says nothing about much longer runs.
+figures:
+  - >-
+    The size of the energy error against time for the explicit Euler, the symplectic Euler
+    and the leapfrog method, at 50 steps per period.
+level: introductory

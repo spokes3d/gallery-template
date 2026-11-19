@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from gallery_tools import figures as web_figures
+from gallery_tools import native
 from gallery_tools.config import Gallery, GalleryError
 from gallery_tools.study import KINDS, Study, discover
 
@@ -130,18 +131,38 @@ def get_result(
         "python": sys.version.split()[0],
         "codes": provenance(sorted(set(gallery.codes) | set(study.codes))),
     }
+    compilers = native.toolchain(study.sources)
+    if compilers:
+        meta["toolchain"] = compilers
     result_file.parent.mkdir(exist_ok=True)
     result_file.write_bytes(pickle.dumps(result, protocol=4))
     meta_file.write_text(json.dumps(meta, indent=2) + "\n")
     return result, meta
 
 
-def source_fence(code: str) -> str:
+def source_fence(code: str, language: str = "python") -> str:
     """Wrap the complete source without truncating long scripts."""
     ticks = "```"
     while ticks in code:
         ticks += "`"
-    return f"{ticks}python\n{code.rstrip()}\n{ticks}"
+    return f"{ticks}{language}\n{code.rstrip()}\n{ticks}"
+
+
+def other_sources(study: Study) -> list[str]:
+    """The sections of the sources in other languages (``sources`` of ``study.yml``)."""
+    lines = []
+    for path in study.sources:
+        header = native.HEADERS.get(path.suffix.lower())
+        language = native.language_of(path) or native.LANGUAGES.get(header)
+        name = path.relative_to(study.folder).as_posix()
+        title = f"{language.name} source" if language else "Source"
+        lines += [
+            f"## {title}: `{name}`",
+            "",
+            source_fence(path.read_text(), native.fence_of(path)),
+            "",
+        ]
+    return lines
 
 
 def fmt_seconds(seconds: float) -> str:
@@ -305,6 +326,9 @@ def build_study(
             ("Run on", meta["ran_at"][:10]),
             ("Versions", site.versions(study, meta)),
         ]
+        if meta.get("toolchain"):
+            compilers = "; ".join(f"{k}: {v}" for k, v in meta["toolchain"].items())
+            rows.append(("Compilers", compilers))
         if table:
             results_part += ["## Comparison", "", table, ""]
         text = printed.getvalue().strip()
@@ -340,6 +364,7 @@ def build_study(
         "",
         source_fence(study.code),
         "",
+        *other_sources(study),
     ]
     site.studies.mkdir(parents=True, exist_ok=True)
     (site.studies / f"{study.slug}.mdx").write_text("\n".join(page))

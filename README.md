@@ -33,6 +33,7 @@ make docs-dev                               # the site at http://localhost:4321/
 |---|---|
 | `src/gallery_tools/` | the tools: `gallery check`, `build`, `export`, `list`, and the shared study tests |
 | `studies/01_exponential_decay/` | the example study: `study.py`, `study.yml`, `results/` |
+| `studies/02_leapfrog_energy/` | a study in another language: a C program, run and plotted by `study.py` |
 | `gallery.yml` | the gallery: site, recorded codes, private codes, extra fields, public target |
 | `docs/` | the site; the Studies pages are generated |
 | `.github/workflows/sync.yml` | the reusable sync of a private gallery into its public one |
