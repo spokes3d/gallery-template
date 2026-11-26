@@ -151,7 +151,7 @@ category: Global models      # the group in the listing
 kind: verification           # verification, method, example, benchmark or result
 public: false                # goes to the public gallery (see Publishing studies)
 preprint: arXiv:2701.01234   # a `result` needs it before it is public
-codes: [wellbalanced]        # Python codes: versions and commits are recorded with the result
+codes: [plasma-carafe] # Python codes: versions and commits are recorded with the result
 external_codes:              # codes outside Python, written by hand
   SAPIC: v0.3.0 @ 1a2b3c4
 docs_preset: full            # the preset the page shows
