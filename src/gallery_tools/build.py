@@ -3,14 +3,17 @@
 The builder reads each study's docstring and ``study.yml`` without running it, gets the result
 of its docs preset from the cache in ``studies/<stem>/results/`` (or runs it and fills the
 cache), draws the figures with the script's ``plot`` function (as web figures where it can, see
-``gallery_tools.figures``) and writes a page led by the figures: the first paragraph of the description, the figures with their captions, the status,
-the rest of the description, an optional table or the printed output, the details of the run and
-the complete source. It also writes the listing, a gallery of cards (the theme's ``GalleryGrid``)
+``gallery_tools.figures``) and writes a page led by the figures: the first paragraph of the
+description, the figures with their captions, the status, the set-up (``setup`` of the script),
+the rest of the description, an optional table or the printed output, the profile of the run,
+the details, how to run it and the complete source. It also writes the listing, a gallery of cards (the theme's ``GalleryGrid``)
 with each study's front figure (``front_figure`` of ``study.yml``, the first by default), and one
 page per code and per kind that shows the studies using that code or of that kind the same way.
 
 A simulation is run only when there is no cached result for its preset, or when it is asked for
-with ``rerun``; a long run is therefore done once, by hand, and its result is committed.
+with ``rerun``; a long run is therefore done once, by hand, and its result is committed. The run
+is profiled with scope-profiler, with the regions of every library on, and the longest regions
+are kept with the result.
 """
 
 from __future__ import annotations
@@ -22,18 +25,25 @@ import json
 import os
 import pickle
 import runpy
+import shlex
 import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from importlib import metadata
 from pathlib import Path
 from typing import Any
 
+import scope_profiler as sp
+
 from gallery_tools import figures as web_figures
 from gallery_tools import native
-from gallery_tools.config import Gallery, GalleryError
-from gallery_tools.study import KINDS, Study, discover
+from gallery_tools.config import TOOLS, Gallery, GalleryError
+from gallery_tools.study import KINDS, Study, discover, distribution_name, module_name
+
+#: The number of regions of a run's profile kept with its result.
+PROFILE_REGIONS = 15
 
 
 def sanitize_markdown(text: str) -> str:
@@ -96,6 +106,38 @@ def load_script(study: Study) -> dict[str, Any]:
         os.chdir(previous)
 
 
+def profiled(study: Study, simulate: Callable[[], Any]) -> tuple[Any, list[dict]]:
+    """Run ``simulate`` in a scope-profiler session with the regions of every library on.
+
+    Returns the result and the ``PROFILE_REGIONS`` longest regions, each with its number of
+    calls and its total and mean time in seconds. The run is not profiled, and the regions are
+    empty, when a session is open already or with ``profile: false`` in ``study.yml`` (for a
+    study that opens its own session, such as a picnic run with ``profiling=``: sessions do
+    not nest).
+    """
+    if study.meta.get("profile") is False or sp.is_configured():
+        return simulate(), []
+    try:
+        with sp.session(
+            output=None, enable_tags=["*"], verbose=False, suppress_notes=True
+        ):
+            result = simulate()
+            timings = sp.current_timings()
+    finally:
+        sp.reset()  # a finished session stays configured: the next study needs a fresh one
+    regions = [
+        {
+            "region": name,
+            "calls": int(t["num_calls"]),
+            "total": float(f"{t['total']:.4g}"),
+            "mean": float(f"{t['mean']:.4g}"),
+        }
+        for name, t in timings.items()
+    ]
+    regions.sort(key=lambda r: -r["total"])
+    return result, regions[:PROFILE_REGIONS]
+
+
 def get_result(
     gallery: Gallery,
     study: Study,
@@ -120,7 +162,7 @@ def get_result(
     previous = Path.cwd()
     try:
         os.chdir(study.folder)
-        result = namespace["simulate"](preset)
+        result, regions = profiled(study, lambda: namespace["simulate"](preset))
     finally:
         os.chdir(previous)
     seconds = time.time() - start
@@ -131,6 +173,8 @@ def get_result(
         "python": sys.version.split()[0],
         "codes": provenance(sorted(set(gallery.codes) | set(study.codes))),
     }
+    if regions:
+        meta["profile"] = regions
     compilers = native.toolchain(study.sources)
     if compilers:
         meta["toolchain"] = compilers
@@ -172,6 +216,69 @@ def fmt_seconds(seconds: float) -> str:
     if seconds < 5400:
         return f"{seconds / 60:.0f} min"
     return f"{seconds / 3600:.1f} h"
+
+
+def fmt_duration(seconds: float) -> str:
+    """A duration of a profiled region, in the unit that suits it."""
+    if seconds < 1e-3:
+        return f"{seconds * 1e6:.3g} µs"
+    if seconds < 1:
+        return f"{seconds * 1e3:.3g} ms"
+    return f"{seconds:.3g} s"
+
+
+def profile_part(meta: dict[str, Any]) -> list[str]:
+    """The section of the run's profile: its longest regions (empty without a profile)."""
+    regions = meta.get("profile") or []
+    if not regions:
+        return []
+    wall = meta.get("wall_seconds") or 0
+    rows = [
+        f"| `{r['region']}` | {r['calls']} | {fmt_duration(r['total'])} "
+        f"| {fmt_duration(r['mean'])} | "
+        + (f"{100 * r['total'] / wall:.0f}%" if wall else "")
+        + " |"
+        for r in regions
+    ]
+    return [
+        "## Profile",
+        "",
+        "The longest regions of the run, from scope-profiler with the regions of every "
+        "library on. Regions can nest, so their times overlap.",
+        "",
+        "| Region | Calls | Total | Mean | Of the run |",
+        "|---|---|---|---|---|",
+        *rows,
+        "",
+    ]
+
+
+def setup_part(study: Study, namespace: dict[str, Any], preset: str) -> list[str]:
+    """The section of the set-up, from the script's optional ``setup(preset)``.
+
+    ``setup`` returns the set-up of the preset as a mapping, label to value (model, domain,
+    grid, time step, ...), without running the simulation.
+    """
+    if "setup" not in namespace:
+        return []
+    previous = Path.cwd()
+    try:
+        os.chdir(study.folder)
+        rows = namespace["setup"](preset)
+    finally:
+        os.chdir(previous)
+    if not isinstance(rows, dict):
+        raise GalleryError(
+            f"{study.stem}: setup({preset!r}) must return a mapping, label to value"
+        )
+    return [
+        "## Set-up",
+        "",
+        "| | |",
+        "|---|---|",
+        *[f"| {label} | {value} |" for label, value in rows.items()],
+        "",
+    ]
 
 
 def slugify(name: str) -> str:
@@ -238,6 +345,91 @@ class Site:
         return rows
 
 
+def requirements(site: Site, study: Study, meta: dict[str, Any]) -> list[str]:
+    """What ``pip install`` needs for the study: the recorded versions where they are released.
+
+    The codes of the study and the distributions of its imports; a code recorded with a git
+    commit (an editable or git install) is not pinned, since its version need not be released.
+    The private codes of the gallery are left out (``run_part`` says so).
+    """
+    names = {distribution_name(c) for c in [*site.gallery.codes, *study.codes]}
+    names |= {distribution_name(m) for m in study.third_party()}
+    private = {module_name(c) for c in site.gallery.private_codes}
+    recorded = {distribution_name(k): v for k, v in meta.get("codes", {}).items()}
+    out = []
+    for name in sorted(names, key=str.lower):
+        if module_name(name) in private:
+            continue
+        if module_name(name) == "gallery_tools":
+            out.append(TOOLS)
+            continue
+        entry = recorded.get(name, {})
+        pinned = entry.get("version") and not entry.get("commit")
+        out.append(f"{name}=={entry['version']}" if pinned else name)
+    return out
+
+
+def run_part(
+    site: Site, study: Study, meta: dict[str, Any], preset: str, output: Path
+) -> list[str]:
+    """The section on running the study: install, run, and the files to download.
+
+    Copies ``study.py`` and its other sources into ``output``, the folder of the page's files.
+    """
+    files = [study.source, *study.sources]
+    links = []
+    for path in files:
+        name = path.relative_to(study.folder).as_posix()
+        target = output / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+        links.append(f"[{name}]({site.base}/studies/{study.slug}/{name})")
+    install = " ".join(shlex.quote(r) for r in requirements(site, study, meta))
+    command = "python study.py"
+    if "--preset" in study.code:
+        command += f" --preset {preset}"
+    private = sorted(
+        c
+        for c in {*study.codes, *map(distribution_name, study.third_party())}
+        if module_name(c) in {module_name(p) for p in site.gallery.private_codes}
+    )
+    lines = [
+        "## Run it",
+        "",
+        "Download "
+        + (
+            " and ".join(links)
+            if len(links) < 3
+            else ", ".join(links[:-1]) + " and " + links[-1]
+        )
+        + (" into one folder" if len(links) > 1 else "")
+        + ", then:",
+        "",
+        "```bash",
+        *([f"pip install {install}"] if install else []),
+        command,
+        "```",
+        "",
+        f"The `{preset}` preset took "
+        + (
+            fmt_seconds(meta["wall_seconds"])
+            if meta["wall_seconds"] >= 1
+            else "under a second"
+        )
+        + " for the result shown here.",
+    ]
+    if "smoke" in study.presets and "--preset" in study.code and preset != "smoke":
+        lines[-1] += " `--preset smoke` checks the set-up in seconds."
+    if private:
+        lines += [
+            "",
+            f"It needs {', '.join(private)}, which "
+            + ("is" if len(private) == 1 else "are")
+            + " not public: this page shows the cached result.",
+        ]
+    return [*lines, ""]
+
+
 PLOTLY_FIGURE = "import PlotlyFigure from '@max-models/starlight-theme/components/PlotlyFigure.astro';"
 
 
@@ -277,6 +469,9 @@ def build_study(
     intro, _, rest = study.description.partition("\n\n")
     figures_part: list[str] = []
     results_part: list[str] = []
+    setup_lines: list[str] = []
+    profile_lines: list[str] = []
+    run_lines: list[str] = []
     if study.stub:
         rows.append(("State", "in development, not run"))
     else:
@@ -319,6 +514,9 @@ def build_study(
                 "",
             ]
         plt.close("all")
+        setup_lines = setup_part(study, namespace, preset)
+        profile_lines = profile_part(meta)
+        run_lines = run_part(site, study, meta, preset, output)
         presets = ", ".join(f"`{p}`" for p in study.presets)
         rows += [
             ("Preset shown", f"`{preset}` (of {presets})"),
@@ -350,16 +548,20 @@ def build_study(
         f":::note[Status]\n{sanitize_markdown(str(meta_info['status']))}\n:::",
         "",
     ]
+    if setup_lines:
+        page += [sanitize_markdown("\n".join(setup_lines)), ""]
     if rest.strip():
         page += ["## The study", "", sanitize_markdown(rest.strip()), ""]
     page += [
         *results_part,
+        *profile_lines,
         "## Details",
         "",
         "| | |",
         "|---|---|",
         *[f"| {k} | {v} |" for k, v in rows],
         "",
+        *run_lines,
         "## Python source",
         "",
         source_fence(study.code),

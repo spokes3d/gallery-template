@@ -61,8 +61,6 @@ SKELETON = {
 #: The docs extra of the public gallery: a Jupyter kernel for the shared docs workflow, and
 #: plasma-plots and kaleido for the web figures (gallery_tools.figures).
 DOCS_REQUIREMENTS = ("ipykernel", "kaleido", "plasma-plots[web]")
-#: Import names whose distribution is not the import name with dashes.
-DISTRIBUTIONS = {"yaml": "pyyaml", "PIL": "pillow", "sklearn": "scikit-learn"}
 
 
 def public_studies(gallery: Gallery) -> list[Study]:
@@ -100,9 +98,7 @@ def _requirements(gallery: Gallery, studies: list[Study]) -> list[str]:
     """
     names = {c for s in studies for c in s.codes}
     for study in studies:
-        names |= {
-            DISTRIBUTIONS.get(m, distribution_name(m)) for m in study.third_party()
-        }
+        names |= {distribution_name(m) for m in study.third_party()}
     # the tools are a dependency already (`public.tools`): a study imports them for
     # `gallery_tools.native`
     skip = {module_name(c) for c in gallery.private_codes} | {"gallery_tools"}

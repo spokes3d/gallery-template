@@ -301,6 +301,92 @@ def test_build_table_and_intro(gallery):
     assert "Our own introduction." in (site.studies / "index.mdx").read_text()
 
 
+PROFILED = (
+    SCRIPT.replace(
+        'def simulate(preset="full"):\n',
+        'def simulate(preset="full"):\n'
+        "    import scope_profiler as sp\n"
+        "    for _ in range(3):\n"
+        '        with sp.region("squares.step"):\n'
+        "            pass\n",
+    )
+    + """
+
+def setup(preset):
+    return {"Points": PRESETS[preset], "Model": "$y = x^2$"}
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--preset", default="full")
+"""
+)
+
+
+def test_profile_setup_and_run_sections(gallery):
+    folder = write_study(
+        gallery.root, "08_profiled", script=PROFILED, codes=["numpy", "secretcode"]
+    )
+    (folder / "solver.c").write_text("int main(void) { return 0; }\n")
+    meta = yaml.safe_load((folder / "study.yml").read_text())
+    meta["sources"] = ["solver.c"]
+    (folder / "study.yml").write_text(yaml.safe_dump(meta))
+    build(gallery, ["08_profiled"])
+    recorded = json.loads(folder.joinpath("results", "full.json").read_text())
+    step = next(r for r in recorded["profile"] if r["region"] == "squares.step")
+    assert step["calls"] == 3
+    site = Site(gallery)
+    page = (site.studies / "profiled.mdx").read_text()
+    # the set-up of the preset, the profile of the run, and how to run it
+    assert "| Points | 5 |" in page and "| Model | $y = x^2$ |" in page
+    assert "## Profile" in page and "| `squares.step` | 3 |" in page
+    assert "python study.py --preset full" in page
+    numpy_version = recorded["codes"]["numpy"]["version"]
+    assert f"numpy=={numpy_version}" in page and "matplotlib" in page
+    assert "secretcode" not in page.split("pip install")[1].split("\n")[0]
+    assert "It needs secretcode, which is not public" in page
+    assert "`--preset smoke` checks the set-up" in page
+    assert "[solver.c](/private-gallery/studies/profiled/solver.c)" in page
+    assert (site.public / "profiled" / "study.py").read_text() == (
+        folder / "study.py"
+    ).read_text()
+    assert (site.public / "profiled" / "solver.c").exists()
+    order = [":::note[Status]", "## Set-up", "## Profile", "## Details", "## Run it"]
+    assert [page.index(t) for t in order] == sorted(page.index(t) for t in order)
+
+
+def test_profile_off_and_bad_setup(gallery):
+    script = SCRIPT + "\n\ndef setup(preset):\n    return [1, 2]\n"
+    write_study(gallery.root, "09_unprofiled", script=script, profile=False)
+    with pytest.raises(GalleryError, match="must return a mapping"):
+        build(gallery, ["09_unprofiled"])
+    meta = json.loads(
+        (gallery.studies_dir / "09_unprofiled" / "results" / "full.json").read_text()
+    )
+    assert "profile" not in meta
+    # no --preset in the script: the command has none, and there is no profile section
+    build(gallery, ["01_squares"])
+    page = (Site(gallery).studies / "squares.mdx").read_text()
+    assert "python study.py\n" in page and "## Profile" not in page
+    study = Study(gallery.studies_dir / "09_unprofiled")
+    study.meta["profile"] = "no"
+    assert "study.yml: `profile` must be true or false" in study.problems(gallery)
+
+
+def test_requirements_of_tools_and_commits(gallery):
+    from gallery_tools.build import requirements
+    from gallery_tools.config import TOOLS
+
+    script = "from gallery_tools import native\n" + SCRIPT
+    folder = write_study(gallery.root, "10_native", script=script)
+    study = Study(folder)
+    meta = {"codes": {"numpy": {"version": "2.0", "commit": "abc+dirty"}}}
+    needed = requirements(Site(gallery), study, meta)
+    assert TOOLS in needed and "numpy" in needed
+
+
 def test_export(gallery, tmp_path):
     build(gallery, ["01_squares"])
     target = tmp_path / "public"

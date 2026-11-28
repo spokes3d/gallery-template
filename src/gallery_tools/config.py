@@ -9,6 +9,8 @@ from typing import Any
 import yaml
 
 CONFIG = "gallery.yml"
+#: The requirement of the gallery tools, for a public gallery and for the studies that use them.
+TOOLS = "gallery-tools @ git+https://github.com/spokes3d/gallery-template@devel"
 
 
 class GalleryError(Exception):
@@ -24,9 +26,7 @@ class Public:
     title: str
     description: str
     overlay: str = "public"
-    tools: str = (
-        "gallery-tools @ git+https://github.com/spokes3d/gallery-template@devel"
-    )
+    tools: str = TOOLS
     #: Ubuntu packages the public workflows install before the codes, e.g. a Fortran
     #: compiler for codes that are built from source.
     apt_packages: list[str] = field(default_factory=list)
