@@ -2,7 +2,8 @@
 
 The script ``study.py`` is standalone: its module docstring is the title (first line) and the
 text of the page, ``PRESETS`` names its sizes, ``simulate(preset)`` returns a picklable result,
-``plot(result)`` draws the figures and an optional ``table(result)`` returns a Markdown table.
+``plot(result)`` draws the figures, an optional ``table(result)`` returns a Markdown table and an
+optional ``setup(preset)`` the set-up of a preset (model, grid, time step, ...) for the page.
 
 ``study.yml`` holds what the site and the publishing need, read without running the script.
 """
@@ -12,6 +13,7 @@ from __future__ import annotations
 import ast
 import re
 import sys
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +46,7 @@ OPTIONAL = (
     "front_figure",
     "exclude",
     "sources",
+    "profile",
 )
 
 
@@ -57,9 +60,21 @@ def module_name(distribution: str) -> str:
     return distribution.replace("-", "_").lower()
 
 
+#: Import names whose distribution is not the import name with dashes.
+DISTRIBUTIONS = {"yaml": "pyyaml", "PIL": "pillow", "sklearn": "scikit-learn"}
+
+
 def distribution_name(module: str) -> str:
-    """The distribution of an import name, by convention (``plasma_plots`` -> ``plasma-plots``)."""
-    return module.replace("_", "-").lower()
+    """The distribution of an import name.
+
+    The installed distribution that provides the module where there is exactly one
+    (``carafe`` -> ``plasma-carafe``), else ``DISTRIBUTIONS``, else the convention
+    (``plasma_plots`` -> ``plasma-plots``).
+    """
+    installed = metadata.packages_distributions().get(module, [])
+    if len(set(installed)) == 1:
+        return installed[0].replace("_", "-").lower()
+    return DISTRIBUTIONS.get(module, module.replace("_", "-").lower())
 
 
 class Study:
@@ -241,6 +256,8 @@ class Study:
             front = self.meta.get("front_figure", 1)
             if isinstance(front, bool) or not isinstance(front, int) or front < 1:
                 out.append("study.yml: `front_figure` must be a figure number, from 1")
+            if not isinstance(self.meta.get("profile", True), bool):
+                out.append("study.yml: `profile` must be true or false")
             if not isinstance(self.meta.get("figures", []), list):
                 out.append("study.yml: `figures` must be a list, a caption per figure")
         return out

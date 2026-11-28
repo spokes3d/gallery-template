@@ -18,7 +18,12 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
-dependencies = [ "matplotlib", "numpy", "pyyaml" ]
+dependencies = [
+ "matplotlib",
+ "numpy",
+ "pyyaml",
+ "scope-profiler>=0.8",
+]
 optional-dependencies.dev = [ "gallery-tools[docs,test]", "pre-commit", "pyproject-fmt", "ruff" ]
 # the shared docs workflow installs a Jupyter kernel; web figures need plasma-plots and kaleido
 optional-dependencies.docs = [ "ipykernel", "kaleido", "plasma-plots[web]" ]

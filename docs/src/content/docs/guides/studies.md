@@ -42,6 +42,10 @@ def table(result: dict) -> str:  # optional: a Markdown table the page shows
     ...
 
 
+def setup(preset: str) -> dict:  # optional: the set-up of a preset, for the page
+    return {"Model": "...", "Grid": "64 × 64", "Time step": "$10^{-11}$ s"}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--preset", choices=sorted(PRESETS), default="quick")
@@ -55,7 +59,8 @@ a dataclass, not the dataclass): the cache stores it, and `plot` has to work fro
 alone. Everything `plot` prints appears on the page, unless there is a `table`.
 
 The figures lead the page: the first paragraph of the docstring, then the figures, numbered,
-each with its caption, then the status and the rest of the text. A figure's caption is its own,
+each with its caption, then the status, the set-up and the rest of the text. After the results
+come the profile of the run, the details, how to run the study and its complete source. A figure's caption is its own,
 `plasma_plots.figure(caption=...)` or maxplotlib's `Canvas(caption=...)` (both set
 `fig.caption`), else its entry in `figures` of `study.yml`; the test fails on a figure without
 one. Write the caption to be read without the text: what is plotted against what, and what to
@@ -94,6 +99,29 @@ def plot(result: dict):
 
     return FuncAnimation(fig, update, frames=len(result["phi"]))
 ```
+
+### Set-up
+
+`setup(preset)` returns the set-up of a preset as a mapping, label to value: the model, the
+domain, the grid, the time step, the number of particles, whatever a reader needs to know before
+the text. The page shows it as a table under the status box. The builder calls it without
+running the simulation, so it must be cheap: read `PRESETS`, build the objects, do not run them.
+Values are Markdown, with `$math$`.
+
+### Profile and "Run it"
+
+A run of a study is profiled with [scope-profiler](https://pypi.org/project/scope-profiler/),
+with the regions of every library on (the tags `*`), and its longest regions are stored with the
+result. The page shows them in a Profile section: a study that only uses numpy has none, one
+that runs carafe, mpiarray or picnic shows where its time went. A study that opens a
+scope-profiler session itself, such as a picnic `Simulation(..., profiling=...)`, sets
+`profile: false` in `study.yml`, since sessions do not nest.
+
+The section "Run it" gives the `pip install` line, with the versions recorded with the result
+(not pinned for a code installed from git), the command, and links to download `study.py` and
+its other sources. The command has `--preset <preset>` when the script's `__main__` block takes
+`--preset`, as in the skeleton above. The private codes of the gallery are left out of the
+install line, with a sentence that says the study needs them.
 
 ## Other languages
 
@@ -163,6 +191,7 @@ figures:                     # captions, in the order plot draws the figures, fo
 front_figure: 2              # the figure on the study's card in the gallery (default 1)
 sources: [solver.f90]        # programs in C, Fortran or Julia the page shows (Other languages)
 exclude: [data/raw/]         # files that stay private when the study is published
+profile: true                # profile the run with scope-profiler (false for own sessions)
 stub: false                  # announced, not yet run: no simulate and plot needed
 ```
 

@@ -60,6 +60,16 @@ def simulate(preset: str = "full") -> dict:
     return {"steps": steps, "errors": errors}
 
 
+def setup(preset: str = "full") -> dict:
+    """The set-up of a preset, for the page (read without running it)."""
+    steps = PRESETS[preset]["steps"]
+    return {
+        "Equation": rf"$\dot y = -\lambda y$, $y(0) = 1$, $\lambda = {RATE:g}$",
+        "Methods": "explicit Euler, midpoint, classical Runge-Kutta",
+        "Steps to $t = 1$": f"{steps[0]} to {steps[-1]}, doubling",
+    }
+
+
 def orders(result: dict) -> dict:
     """The order of each method, from a fit of log(error) against log(h)."""
     h = 1.0 / result["steps"]
